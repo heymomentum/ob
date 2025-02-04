@@ -1,3 +1,4 @@
+// Script 1: Populate Results with Data
 // Utility functions
 function getCookie(name) {
   const nameEQ = name + "=";
@@ -322,7 +323,7 @@ function getCookie(name) {
   return null;
 }
 
-// Timer functions
+// Script 2: Timer functions
 function startTimer(timerElement) {
   const timeParts = timerElement.textContent.split(':');
   let minutes = parseInt(timeParts[0], 10);
@@ -377,4 +378,20 @@ document.addEventListener('DOMContentLoaded', () => {
       startTimer(timerElement);
     });
   }
+});
+
+// Script 3: Reset Steps After Submission
+// Remove formlyLastStep and filledInput from localStorage on page load
+document.addEventListener('DOMContentLoaded', function() {
+    localStorage.removeItem('formlyLastStep');
+    localStorage.removeItem('filledInput');
+
+    // Optional: Log a message to the console for verification
+    console.log('formlyLastStep and filledInput have been removed from localStorage');
+});
+
+// Clear localStorage before the user leaves the page
+window.addEventListener('beforeunload', function() {
+    localStorage.removeItem('formlyLastStep');
+    localStorage.removeItem('filledInput');
 });
