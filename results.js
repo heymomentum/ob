@@ -300,3 +300,81 @@ document.addEventListener('DOMContentLoaded', () => {
   displayUserName();
   displayAdditionalData();
 });
+
+// Timer Features
+// Utility functions
+function setCookie(name, value, days) {
+  const date = new Date();
+  date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+  const expires = "expires=" + date.toUTCString();
+  document.cookie = name + "=" + value + ";" + expires + ";path=/";
+  console.log(`Cookie set: ${name} = ${value}`);
+}
+
+function getCookie(name) {
+  const nameEQ = name + "=";
+  const ca = document.cookie.split(';');
+  for (let i = 0; i < ca.length; i++) {
+    let c = ca[i];
+    while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+    if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+  }
+  return null;
+}
+
+// Timer functions
+function startTimer(timerElement) {
+  const timeParts = timerElement.textContent.split(':');
+  let minutes = parseInt(timeParts[0], 10);
+  let seconds = parseInt(timeParts[1], 10);
+  let totalSeconds = minutes * 60 + seconds;
+
+  function updateTimer() {
+    if (totalSeconds <= 0) {
+      clearInterval(timerInterval);
+      handleTimerComplete();
+    } else {
+      totalSeconds--;
+      const minutesLeft = Math.floor(totalSeconds / 60);
+      const secondsLeft = totalSeconds % 60;
+      timerElement.textContent = `${minutesLeft}:${secondsLeft < 10 ? '0' : ''}${secondsLeft}`;
+    }
+  }
+
+  const timerInterval = setInterval(updateTimer, 1000);
+}
+
+function handleTimerComplete() {
+  document.querySelectorAll('[custom-data="timer-hide"]').forEach(element => {
+    element.classList.add('hide-block');
+  });
+
+  document.querySelectorAll('[custom-data="timer-show"]').forEach(element => {
+    element.classList.remove('hide-block');
+  });
+
+  setCookie('timer-complete', 'true', 1);
+}
+
+function applyTimerCompleteClasses() {
+  document.querySelectorAll('[custom-data="timer-hide"]').forEach(element => {
+    element.classList.add('hide-block');
+  });
+
+  document.querySelectorAll('[custom-data="timer-show"]').forEach(element => {
+    element.classList.remove('hide-block');
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('Timer script loaded and running');
+  
+  if (getCookie('timer-complete') === 'true') {
+    applyTimerCompleteClasses();
+  } else {
+    const timerElements = document.querySelectorAll('[custom-data="timer"]');
+    timerElements.forEach(timerElement => {
+      startTimer(timerElement);
+    });
+  }
+});
