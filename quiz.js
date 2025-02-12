@@ -242,7 +242,7 @@ function setupEventListeners() {
   setupRadioButtonListeners();
   setupTextInputListeners();
   setupWeeklyWorkoutsListeners();
-  setupWorkoutLocationListeners();
+  setupCheckboxGroupListeners();
   document.addEventListener('bmiCalculated', updateBMIIndicatorPosition);
 }
 
@@ -466,20 +466,35 @@ function handleWeeklyWorkoutsChange(event) {
   console.log(`${name} cookie updated: ${value}`);
 }
 
-// New functions for workout location
-function setupWorkoutLocationListeners() {
-  document.querySelectorAll('[custom-data="workout-location"]').forEach(checkbox => {
-    checkbox.addEventListener('change', handleWorkoutLocationChange);
+// New functions for checkbox groups
+function setupCheckboxGroupListeners() {
+  // Find all elements that have checkbox-group attribute
+  const checkboxGroups = document.querySelectorAll('[checkbox-group]');
+  checkboxGroups.forEach(group => {
+    const groupName = group.getAttribute('checkbox-group');
+    const checkboxes = group.querySelectorAll('input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+      checkbox.addEventListener('change', () => handleCheckboxGroupChange(groupName));
+    });
   });
 }
 
-function handleWorkoutLocationChange() {
-  const selectedLocations = Array.from(document.querySelectorAll('[custom-data="workout-location"]'))
-    .filter(checkbox => checkbox.querySelector('input[type="checkbox"]').checked)
-    .map(checkbox => checkbox.getAttribute('workout-location'))
-    .join(' & ');
-  setCookie('workout-location', selectedLocations, 1);
-  console.log(`Workout location cookie updated: ${selectedLocations}`);
+function handleCheckboxGroupChange(groupName) {
+  // Find all checkboxes in this group
+  const checkboxes = document.querySelectorAll(`[checkbox-group="${groupName}"] input[type="checkbox"]:checked`);
+  
+  // Get the names/values of checked checkboxes
+  const selectedValues = Array.from(checkboxes).map(checkbox => {
+    // Try to get the name from the parent element or the checkbox itself
+    return checkbox.closest('[name]')?.getAttribute('name') || 
+           checkbox.getAttribute('name') || 
+           checkbox.value;
+  }).filter(Boolean); // Remove any undefined/null values
+  
+  // Join the values with ' & ' and save to cookie
+  const cookieValue = selectedValues.join(' & ');
+  setCookie(groupName, cookieValue, 1);
+  console.log(`${groupName} cookie updated: ${cookieValue}`);
 }
 
 function updateGoalWeightFromCookie() {
@@ -492,6 +507,7 @@ function updateGoalWeightFromCookie() {
 document.addEventListener('DOMContentLoaded', () => {
   console.log('DOM fully loaded and parsed');
   setupEventListeners();
+  setupCheckboxGroupListeners();
   updateBMI();
   updateFitnessLevel();
   updateMetabolismDisplay();
