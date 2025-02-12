@@ -391,8 +391,14 @@ function setupRadioButtonListeners() {
 
 function handleRadioButtonChange(event) {
   const { name, value } = event.target;
+  const uniValue = event.target.getAttribute('uni-value');
+  
+  // Save localized value
   setCookie(name, value, 1);
-  console.log(`${name} cookie updated: ${value}`);
+  // Save universal value
+  setCookie(`${name}-uni`, uniValue, 1);
+  
+  console.log(`Radio cookie set: ${name}=${value}, ${name}-uni=${uniValue}`);
 
   if (name === 'body-type') {
     updateMetabolismDisplay();
@@ -474,27 +480,30 @@ function setupCheckboxGroupListeners() {
     const groupName = group.getAttribute('checkbox-group');
     const checkboxes = group.querySelectorAll('input[type="checkbox"]');
     checkboxes.forEach(checkbox => {
-      checkbox.addEventListener('change', () => handleCheckboxGroupChange(groupName));
+      checkbox.addEventListener('change', () => handleCheckboxGroupChange(group, groupName));
     });
   });
 }
 
-function handleCheckboxGroupChange(groupName) {
-  // Find all checkboxes in this group
-  const checkboxes = document.querySelectorAll(`[checkbox-group="${groupName}"] input[type="checkbox"]:checked`);
+function handleCheckboxGroupChange(groupContainer, groupName) {
+  // Get selected checkboxes
+  const selectedCheckboxes = Array.from(groupContainer.querySelectorAll('input[type="checkbox"]:checked'));
   
-  // Get the names/values of checked checkboxes
-  const selectedValues = Array.from(checkboxes).map(checkbox => {
-    // Try to get the name from the parent element or the checkbox itself
-    return checkbox.closest('[name]')?.getAttribute('name') || 
-           checkbox.getAttribute('name') || 
-           checkbox.value;
-  }).filter(Boolean); // Remove any undefined/null values
+  // Get localized values
+  const selectedValues = selectedCheckboxes
+    .map(checkbox => checkbox.value)
+    .join(' & ');
+    
+  // Get universal values
+  const selectedUniValues = selectedCheckboxes
+    .map(checkbox => checkbox.getAttribute('uni-value'))
+    .join(' & ');
+    
+  // Save both cookies
+  setCookie(groupName, selectedValues, 1);
+  setCookie(`${groupName}-uni`, selectedUniValues, 1);
   
-  // Join the values with ' & ' and save to cookie
-  const cookieValue = selectedValues.join(' & ');
-  setCookie(groupName, cookieValue, 1);
-  console.log(`${groupName} cookie updated: ${cookieValue}`);
+  console.log(`Checkbox group cookies set: ${groupName}=${selectedValues}, ${groupName}-uni=${selectedUniValues}`);
 }
 
 function updateGoalWeightFromCookie() {
