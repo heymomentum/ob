@@ -299,10 +299,8 @@ document.addEventListener('DOMContentLoaded', () => {
   displayUserName();
   displayAdditionalData();
 });
-</script>
 
-<!-- Pricing Form Submission -->
-<script>
+// Pricing Form Submission Script
 // Utility functions
 function setCookie(name, value, days) {
   const date = new Date();
@@ -361,7 +359,6 @@ document.addEventListener('DOMContentLoaded', () => {
   console.log('Pricing page script loaded and running');
   setupFormListeners();
 });
-</script>
 
 // Timer Features Script
 // Utility functions
