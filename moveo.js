@@ -141,16 +141,37 @@ function trackFormValues() {
         'workout-duration', 'workout-frequency', 'calisthenics-experience'
     ];
 
+    // Fields that have universal values
+    const universalFields = [
+        'body-goal', 'body-type', 'diet-type', 'workout-location',
+        'main-goal', 'bad-habits', 'best-shape', 'muscle-group', 
+        'problem-area', 'sleep-levels', 'water-intake', 'energy-levels',
+        'work-schedule', 'physical-build', 'weekly-workouts',
+        'workout-duration', 'workout-frequency', 'calisthenics-experience'
+    ];
+
     // Collect all cookie data - only read, don't modify
     cookieFields.forEach(field => {
+        // Get regular value
         const value = getCookie(field);
         if (value !== null && value !== undefined && value !== '') {
             // Only split into array if it's meant to be an array field
             const arrayFields = ['muscle-group', 'problem-area', 'bad-habits'];
-            if (arrayFields.includes(field) && value.includes(',')) {
-                formData[field.replace('-input', '')] = value.split(',').map(v => v.trim());
+            if (arrayFields.includes(field) && value.includes(' & ')) {
+                formData[field.replace('-input', '')] = value.split(' & ').map(v => v.trim());
             } else {
                 formData[field.replace('-input', '')] = value;
+            }
+        }
+
+        // If this field has a universal value, get it too
+        if (universalFields.includes(field)) {
+            const uniValue = getCookie(`${field}-uni`);
+            if (uniValue !== null && uniValue !== undefined && uniValue !== '') {
+                const fieldName = field.replace('-input', '');
+                formData[`${fieldName}_universal`] = arrayFields.includes(field) && uniValue.includes(' & ')
+                    ? uniValue.split(' & ').map(v => v.trim())
+                    : uniValue;
             }
         }
     });

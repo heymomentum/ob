@@ -300,66 +300,6 @@ document.addEventListener('DOMContentLoaded', () => {
   displayAdditionalData();
 });
 
-// Pricing Form Submission Script
-// Utility functions
-function setCookie(name, value, days) {
-  const date = new Date();
-  date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-  const expires = "expires=" + date.toUTCString();
-  document.cookie = name + "=" + value + ";" + expires + ";path=/";
-  console.log(`Cookie set: ${name} = ${value}`);
-}
-
-function getCookie(name) {
-  const nameEQ = name + "=";
-  const ca = document.cookie.split(';');
-  for (let i = 0; i < ca.length; i++) {
-    let c = ca[i];
-    while (c.charAt(0) === ' ') c = c.substring(1, c.length);
-    if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
-  }
-  return null;
-}
-
-// Function to handle form submission
-function handleFormSubmission(event) {
-  event.preventDefault(); // Prevent the default form submission
-
-  const form = event.target;
-  const formData = new FormData(form);
-  let selectedPricing = null;
-  formData.forEach((value, key) => {
-    if (key.startsWith('Pricing')) {
-      selectedPricing = value;
-    }
-  });
-
-  console.log(`Form submitted: ${form.getAttribute('name')}`);
-  console.log(`Selected pricing: ${selectedPricing}`);
-
-  if (selectedPricing) {
-    setCookie('selected-pricing', selectedPricing, 1); // Save the selected pricing plan to a cookie
-    console.log(`Selected pricing plan saved: ${selectedPricing}`);
-    window.location.href = form.getAttribute('data-redirect'); // Redirect to the specified URL
-  } else {
-    console.log('No pricing plan selected');
-  }
-}
-
-// Set up event listeners for both forms
-function setupFormListeners() {
-  const forms = document.querySelectorAll('form[id^="wf-form-Pricing-"]');
-  forms.forEach(form => {
-    form.addEventListener('submit', handleFormSubmission);
-    console.log(`Event listener added to form: ${form.getAttribute('name')}`);
-  });
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  console.log('Pricing page script loaded and running');
-  setupFormListeners();
-});
-
 // Timer Features Script
 // Utility functions
 function setCookie(name, value, days) {
