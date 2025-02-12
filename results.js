@@ -1,4 +1,4 @@
-// Script 1: Populate Results with Data
+// Results data population script
 // Utility functions
 function getCookie(name) {
   const nameEQ = name + "=";
@@ -58,30 +58,32 @@ function displayBodyFatPercentage() {
 function displayFitnessLevel() {
   const fitnessLevel = getCookie('fitness-level');
   console.log(`Fitness Level from cookie: ${fitnessLevel}`);
-  let level = 0;
+  let filledBars = 0;
 
   switch (fitnessLevel) {
-    case 'Excellent':
-      level = 4;
+    case 'Excelente':
+      filledBars = 5;
       break;
-    case 'Good':
-      level = 3;
+    case 'Buena':
+      filledBars = 4;
       break;
-    case 'Intermediate':
-      level = 2;
+    case 'Intermedio':
+      filledBars = 3;
       break;
-    case 'Basic':
-      level = 1;
+    case 'Básica':
+      filledBars = 2;
       break;
+    default:
+      filledBars = 1;
   }
 
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 1; i <= 5; i++) {
     const element = document.querySelector(`[custom-data="fitness-level-bar-${i}"]`);
     if (element) {
-      if (i <= level) {
-        element.classList.add('black');
+      if (i <= filledBars) {
+        element.classList.add('green');
       } else {
-        element.classList.remove('black');
+        element.classList.remove('green');
       }
     }
   }
@@ -141,11 +143,11 @@ function updateBMIExplainers(bmi) {
   }
 }
 
-function calculateBMR(weight, height, age, gender) {
+function calculateBMR(weightKg, heightCm, age, gender) {
   if (gender === 'male' || gender === null) { // Default to male if gender is null
-    return 88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age);
+    return 88.362 + (13.397 * weightKg) + (4.799 * heightCm) - (5.677 * age);
   }
-  return 447.593 + (9.247 * weight) + (3.098 * height) - (4.330 * age);
+  return 447.593 + (9.247 * weightKg) + (3.098 * heightCm) - (4.330 * age);
 }
 
 function calculateTotalDailyExpenditure(bmr, workouts) {
@@ -161,34 +163,30 @@ function calculateTotalDailyExpenditure(bmr, workouts) {
 
 function calculateRecommendedCalories(weight, goalWeight, totalDailyExpenditure) {
   if (goalWeight < weight) {
-    return totalDailyExpenditure - 250;
+    return totalDailyExpenditure;
   }
   return totalDailyExpenditure + 250;
 }
 
 function displayRecommendedCalories() {
-  const weightLbs = parseFloat(getCookie('weight-lbs'));
-  const heightFeet = parseFloat(getCookie('height-feet'));
-  const heightInches = parseFloat(getCookie('height-inches')) || 0;
+  const weightKg = parseFloat(getCookie('weight-kg'));
+  const heightCm = parseFloat(getCookie('height-cm'));
   const age = parseInt(getCookie('age'));
   const gender = getCookie('gender');
-  const goalWeightLbs = parseFloat(getCookie('goal-weight-lbs'));
+  const goalWeightKg = parseFloat(getCookie('goal-weight-kg'));
   const workouts = getCookie('weekly-workouts');
-  console.log(`Weight: ${weightLbs}, Height: ${heightFeet}ft ${heightInches}in, Age: ${age}, Gender: ${gender}, Goal Weight: ${goalWeightLbs}, Workouts: ${workouts}`);
+  console.log(`Weight: ${weightKg}kg, Height: ${heightCm}cm, Age: ${age}, Gender: ${gender}, Goal Weight: ${goalWeightKg}kg, Workouts: ${workouts}`);
 
-  if (isNaN(weightLbs) || isNaN(heightFeet) || isNaN(age) || isNaN(goalWeightLbs)) {
+  if (isNaN(weightKg) || isNaN(heightCm) || isNaN(age) || isNaN(goalWeightKg)) {
     console.log('One or more required cookies are invalid');
     return;
   }
 
-  const weight = weightLbs * 0.453592; // Convert lbs to kg
-  const height = (heightFeet * 12 + heightInches) * 2.54; // Convert inches to cm
-
-  const bmr = calculateBMR(weight, height, age, gender);
+  const bmr = calculateBMR(weightKg, heightCm, age, gender);
   console.log(`Calculated BMR: ${bmr}`);
   const totalDailyExpenditure = calculateTotalDailyExpenditure(bmr, workouts);
   console.log(`Total Daily Expenditure: ${totalDailyExpenditure}`);
-  const recommendedCalories = calculateRecommendedCalories(weight, goalWeightLbs * 0.453592, totalDailyExpenditure);
+  const recommendedCalories = calculateRecommendedCalories(weightKg, goalWeightKg, totalDailyExpenditure);
   console.log(`Recommended Calories: ${recommendedCalories}`);
 
   const caloriesResultElement = document.querySelector('[custom-data="calories-result"]');
@@ -207,24 +205,24 @@ function displayRecommendedCalories() {
 }
 
 function displayWaterIntake() {
-  const weightLbs = parseFloat(getCookie('weight-lbs'));
-  console.log(`Weight from cookie: ${weightLbs}`);
-  if (isNaN(weightLbs)) {
+  const weightKg = parseFloat(getCookie('weight-kg'));
+  console.log(`Weight from cookie: ${weightKg} kg`);
+  if (isNaN(weightKg)) {
     console.log('Weight cookie is invalid');
     return;
   }
 
-  const dailyWaterOunces = weightLbs * 0.66;
-  console.log(`Calculated daily water intake in ounces: ${dailyWaterOunces}`);
+  const dailyWaterLiters = weightKg * 0.033; // Approximately 33 ml per kg of body weight
+  console.log(`Calculated daily water intake in liters: ${dailyWaterLiters}`);
 
   const waterResultElement = document.querySelector('[custom-data="water-result"]');
   if (waterResultElement) {
-    waterResultElement.textContent = Math.round(dailyWaterOunces); // Changed to round number
+    waterResultElement.textContent = dailyWaterLiters.toFixed(1); // Display with one decimal place
   }
 
-  const minOunces = 4 * 8; // 4 glasses * 8 ounces per glass
-  const maxOunces = 16 * 8; // 16 glasses * 8 ounces per glass
-  const waterPercentage = ((dailyWaterOunces - minOunces) / (maxOunces - minOunces)) * 100;
+  const minLiters = 1.5; // Minimum recommended daily water intake
+  const maxLiters = 3.5; // Maximum recommended daily water intake
+  const waterPercentage = ((dailyWaterLiters - minLiters) / (maxLiters - minLiters)) * 100;
   const adjustedWaterPercentage = Math.max(0, Math.min(100, waterPercentage));
   console.log(`Water Indicator Percentage: ${adjustedWaterPercentage}%`);
 
@@ -248,8 +246,8 @@ function displayAdditionalData() {
   const workoutDuration = getCookie('workout-duration');
   const workoutLocation = getCookie('workout-location');
   const workoutFrequency = getCookie('weekly-workouts');
-  const currentWeight = getCookie('weight-lbs');
-  const goalWeight = getCookie('goal-weight-lbs');
+  const currentWeight = getCookie('weight-kg');
+  const goalWeight = getCookie('goal-weight-kg');
   const mainGoal = getCookie('main-goal');
 
   console.log(`Workout Duration from cookie: ${workoutDuration}`);
@@ -301,8 +299,10 @@ document.addEventListener('DOMContentLoaded', () => {
   displayUserName();
   displayAdditionalData();
 });
+</script>
 
-// Timer Features
+<!-- Pricing Form Submission -->
+<script>
 // Utility functions
 function setCookie(name, value, days) {
   const date = new Date();
@@ -323,7 +323,68 @@ function getCookie(name) {
   return null;
 }
 
-// Script 2: Timer functions
+// Function to handle form submission
+function handleFormSubmission(event) {
+  event.preventDefault(); // Prevent the default form submission
+
+  const form = event.target;
+  const formData = new FormData(form);
+  let selectedPricing = null;
+  formData.forEach((value, key) => {
+    if (key.startsWith('Pricing')) {
+      selectedPricing = value;
+    }
+  });
+
+  console.log(`Form submitted: ${form.getAttribute('name')}`);
+  console.log(`Selected pricing: ${selectedPricing}`);
+
+  if (selectedPricing) {
+    setCookie('selected-pricing', selectedPricing, 1); // Save the selected pricing plan to a cookie
+    console.log(`Selected pricing plan saved: ${selectedPricing}`);
+    window.location.href = form.getAttribute('data-redirect'); // Redirect to the specified URL
+  } else {
+    console.log('No pricing plan selected');
+  }
+}
+
+// Set up event listeners for both forms
+function setupFormListeners() {
+  const forms = document.querySelectorAll('form[id^="wf-form-Pricing-"]');
+  forms.forEach(form => {
+    form.addEventListener('submit', handleFormSubmission);
+    console.log(`Event listener added to form: ${form.getAttribute('name')}`);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('Pricing page script loaded and running');
+  setupFormListeners();
+});
+</script>
+
+// Timer Features Script
+// Utility functions
+function setCookie(name, value, days) {
+  const date = new Date();
+  date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+  const expires = "expires=" + date.toUTCString();
+  document.cookie = name + "=" + value + ";" + expires + ";path=/";
+  console.log(`Cookie set: ${name} = ${value}`);
+}
+
+function getCookie(name) {
+  const nameEQ = name + "=";
+  const ca = document.cookie.split(';');
+  for (let i = 0; i < ca.length; i++) {
+    let c = ca[i];
+    while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+    if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+  }
+  return null;
+}
+
+// Timer functions
 function startTimer(timerElement) {
   const timeParts = timerElement.textContent.split(':');
   let minutes = parseInt(timeParts[0], 10);
@@ -380,7 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// Script 3: Reset Steps After Submission
+// Reset Steps After Submission Script
 // Remove formlyLastStep and filledInput from localStorage on page load
 document.addEventListener('DOMContentLoaded', function() {
     localStorage.removeItem('formlyLastStep');
