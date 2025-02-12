@@ -491,12 +491,14 @@ function handleCheckboxGroupChange(groupContainer, groupName) {
   
   // Get localized values
   const selectedValues = selectedCheckboxes
-    .map(checkbox => checkbox.value)
+    .map(checkbox => checkbox.getAttribute('data-name') || checkbox.name)
+    .filter(Boolean)
     .join(' & ');
     
   // Get universal values
   const selectedUniValues = selectedCheckboxes
     .map(checkbox => checkbox.getAttribute('uni-value'))
+    .filter(Boolean)
     .join(' & ');
     
   // Save both cookies
