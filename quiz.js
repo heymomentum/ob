@@ -178,13 +178,40 @@ function updateFitnessLevel() {
   if (pullUpsValue !== null && workoutFrequencyValue !== null) {
     const fitnessPoints = calculateFitnessPoints(pullUpsValue, workoutFrequencyValue);
     const fitnessLevel = determineFitnessLevel(fitnessPoints);
-    setCookie('fitness-level', fitnessLevel, 1); // Save fitness level to cookie
+    setCookie('fitness-level', fitnessLevel, 1);
 
+    // Update text display
     document.querySelectorAll('[custom-data="fitness-level"]').forEach(fitnessLevelElement => {
       fitnessLevelElement.textContent = fitnessLevel;
     });
 
-    // Update fitness level bar
+    // Hide all fitness level explanations first
+    document.querySelectorAll('[custom-data^="fitness-level-"]').forEach(element => {
+      element.classList.add('hide-block');
+    });
+
+    // Show the appropriate fitness level explanation
+    let fitnessLevelElement;
+    switch (fitnessLevel) {
+      case 'Excellent':
+        fitnessLevelElement = document.querySelector('[custom-data="fitness-level-excellent"]');
+        break;
+      case 'Good':
+        fitnessLevelElement = document.querySelector('[custom-data="fitness-level-good"]');
+        break;
+      case 'Intermediate':
+        fitnessLevelElement = document.querySelector('[custom-data="fitness-level-intermediate"]');
+        break;
+      case 'Basic':
+        fitnessLevelElement = document.querySelector('[custom-data="fitness-level-basic"]');
+        break;
+    }
+
+    if (fitnessLevelElement) {
+      fitnessLevelElement.classList.remove('hide-block');
+    }
+
+    // Update the fitness level bars (existing functionality)
     updateFitnessLevelBar(fitnessLevel);
   }
 }
@@ -194,16 +221,16 @@ function updateFitnessLevelBar(fitnessLevel) {
   let filledBars = 0;
 
   switch (fitnessLevel) {
-    case 'Excelente':
+    case 'Excellent':
       filledBars = 5;
       break;
-    case 'Buena':
+    case 'Good':
       filledBars = 4;
       break;
-    case 'Intermedio':
+    case 'Intermediate':
       filledBars = 3;
       break;
-    case 'Básica':
+    case 'Basic':
       filledBars = 2;
       break;
     default:
@@ -258,13 +285,13 @@ function calculateFitnessPoints(pullUpsValue, workoutFrequencyValue) {
 
 function determineFitnessLevel(fitnessPoints) {
   if (fitnessPoints >= 5) {
-    return 'Excelente';
+    return 'Excellent';
   } else if (fitnessPoints === 4) {
-    return 'Buena';
+    return 'Good';
   } else if (fitnessPoints >= 2) {
-    return 'Intermedio';
+    return 'Intermediate';
   } else {
-    return 'Básica';
+    return 'Basic';
   }
 }
 
