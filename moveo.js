@@ -29,7 +29,7 @@ function updateSubmitRedirects() {
     // Create the query string with null values if empty
     const queryString = `?firstName=${name || 'null'}&lastName=null&fullName=null&email=${email || 'null'}`;
     
-    // Combine base URL with query string`
+    // Combine base URL with query string
     const fullUrl = baseUrl + queryString;
 
     // Update form handling
@@ -130,100 +130,46 @@ function periodicSubmitUpdate() {
 function trackFormValues() {
     const formData = {};
     
-    // Define all possible cookie fields we want to track
-    const cookieFields = [
-        'age', 'name-input', 'email-input', 'weight-lbs', 'pull-ups',
-        'body-goal', 'body-type', 'diet-type', 'workout-location',
-        'main-goal', 'bad-habits', 'best-shape', 'height-feet',
-        'goal-weight-lbs', 'typical-day', 'muscle-group', 'problem-area',
-        'sleep-levels', 'water-intake', 'height-inches', 'energy-levels',
-        'work-schedule', 'physical-build', 'weekly-workouts',
-        'workout-duration', 'workout-frequency', 'calisthenics-experience'
-    ];
-
-    // Fields that have universal values
-    const universalFields = [
-        'body-goal', 'body-type', 'diet-type', 'workout-location',
-        'main-goal', 'bad-habits', 'best-shape', 'muscle-group', 
-        'problem-area', 'sleep-levels', 'water-intake', 'energy-levels',
-        'work-schedule', 'physical-build', 'weekly-workouts',
-        'workout-duration', 'workout-frequency', 'calisthenics-experience'
-    ];
-
-    // Collect all cookie data - only read, don't modify
-    cookieFields.forEach(field => {
-        // Get regular value
-        const value = getCookie(field);
-        if (value !== null && value !== undefined && value !== '') {
-            // Only split into array if it's meant to be an array field
-            const arrayFields = ['muscle-group', 'problem-area', 'bad-habits'];
-            if (arrayFields.includes(field) && value.includes(' & ')) {
-                formData[field.replace('-input', '')] = value.split(' & ').map(v => v.trim());
+    // Get all cookies
+    const cookies = document.cookie.split(';');
+    
+    // Process each cookie
+    cookies.forEach(cookie => {
+        let [name, value] = cookie.split('=').map(part => part.trim());
+        
+        // Skip empty cookies
+        if (!value || value === 'null' || value === '') return;
+        
+        // Handle universal value cookies (ending with -uni)
+        if (name.endsWith('-uni')) {
+            // Store the universal value and skip the rest of the loop
+            const baseKey = name.replace('-uni', '');
+            formData[baseKey] = value;
+            return;
+        }
+        
+        // Handle special case for input fields that might have -input suffix
+        if (name.endsWith('-input')) {
+            name = name.replace('-input', '');
+        }
+        
+        // Skip if we already have a universal value for this field
+        if (formData[name]) return;
+        
+        // Handle array fields (comma-separated values)
+        if (value.includes(',')) {
+            formData[name] = value.split(',').map(v => v.trim());
+        } else {
+            // Handle numeric values
+            if (!isNaN(value) && value.trim() !== '') {
+                formData[name] = parseFloat(value);
             } else {
-                formData[field.replace('-input', '')] = value;
-            }
-        }
-
-        // If this field has a universal value, get it too
-        if (universalFields.includes(field)) {
-            const uniValue = getCookie(`${field}-uni`);
-            if (uniValue !== null && uniValue !== undefined && uniValue !== '') {
-                const fieldName = field.replace('-input', '');
-                formData[`${fieldName}_universal`] = arrayFields.includes(field) && uniValue.includes(' & ')
-                    ? uniValue.split(' & ').map(v => v.trim())
-                    : uniValue;
+                formData[name] = value;
             }
         }
     });
 
-    // Collect form data - read only, don't modify form values
-    const steps = document.querySelectorAll('[data-form="step"]');
-    steps.forEach((step) => {
-        // Track radio inputs
-        const radioGroups = step.querySelectorAll('input[type="radio"]');
-        if (radioGroups.length) {
-            radioGroups.forEach(radio => {
-                if (radio.checked) {
-                    formData[radio.name] = radio.value;
-                }
-            });
-        }
-        
-        // Track checkboxes
-        const checkboxes = step.querySelectorAll('input[type="checkbox"]:not([name="Checkbox"])');
-        if (checkboxes.length) {
-            const checkboxGroup = step.querySelector('[checkbox-group]')?.getAttribute('checkbox-group');
-            if (checkboxGroup) {
-                const checkboxValues = [];
-                checkboxes.forEach(checkbox => {
-                    if (checkbox.checked) {
-                        const value = checkbox.getAttribute('data-name') || checkbox.value || checkbox.name;
-                        if (value) checkboxValues.push(value);
-                    }
-                });
-                if (checkboxValues.length) {
-                    formData[checkboxGroup] = checkboxValues;
-                }
-            }
-        }
-        
-        // Track all other inputs
-        const inputs = step.querySelectorAll('input:not([type="radio"]):not([type="checkbox"])');
-        inputs.forEach(input => {
-            if (input.value) {
-                if (input.type === 'email' || input.name.toLowerCase().includes('email')) {
-                    formData['email'] = input.value;
-                } else {
-                    const key = input.name || input.getAttribute('data-name');
-                    if (key) {
-                        formData[key] = input.value;
-                    }
-                }
-            }
-        });
-    });
-
-    // Map fields without modifying original values
+    // Map specific fields for backward compatibility
     const fieldMapping = {
         'weight-lbs': 'Weight',
         'height-feet': 'Height-Feet',
