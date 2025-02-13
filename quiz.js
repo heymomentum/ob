@@ -324,6 +324,7 @@ function setupWeightInputListeners() {
 function handleWeightKgInputChange() {
   const weightKg = this.value;
   setCookie('weight-kg', weightKg, 1);
+  setCookie('weight-unit', 'metric', 1);
   console.log(`Weight kg cookie updated: ${weightKg}`);
   updateBMI();
   updateGoalWeightDate();
@@ -332,13 +333,22 @@ function handleWeightKgInputChange() {
 
 function handleWeightLbsInputChange() {
   const weightLbs = this.value;
-  const weightKg = weightLbs * 0.453592;
   setCookie('weight-lbs', weightLbs, 1);
-  setCookie('weight-kg', weightKg.toFixed(2), 1);
-  console.log(`Weight lbs cookie updated: ${weightLbs}, converted to kg: ${weightKg}`);
+  setCookie('weight-unit', 'imperial', 1);
+  console.log(`Weight lbs cookie updated: ${weightLbs}`);
   updateBMI();
   updateGoalWeightDate();
   document.dispatchEvent(new Event('updateChartAndGoalDate'));
+}
+
+function getNormalizedWeight() {
+  const unit = getCookie('weight-unit');
+  if (unit === 'metric') {
+    return parseFloat(getCookie('weight-kg'));
+  } else {
+    const weightLbs = parseFloat(getCookie('weight-lbs'));
+    return weightLbs * 0.453592;
+  }
 }
 
 function setupHeightInputListeners() {
@@ -400,51 +410,60 @@ function setupGoalWeightInputListener() {
 function handleGoalWeightKgInputChange() {
   const goalWeightKg = this.value;
   setCookie('goal-weight-kg', goalWeightKg, 1);
+  setCookie('goal-weight-unit', 'metric', 1);
   console.log(`Goal weight kg cookie updated: ${goalWeightKg}`);
-  updateGoalWeightDisplay(goalWeightKg, 'metric');
+  updateGoalWeightDisplay();
   updateGoalWeightDate();
   document.dispatchEvent(new Event('updateChartAndGoalDate'));
 }
 
 function handleGoalWeightLbsInputChange() {
   const goalWeightLbs = this.value;
-  const goalWeightKg = goalWeightLbs * 0.453592;
   setCookie('goal-weight-lbs', goalWeightLbs, 1);
-  setCookie('goal-weight-kg', goalWeightKg.toFixed(2), 1);
-  console.log(`Goal weight lbs cookie updated: ${goalWeightLbs}, converted to kg: ${goalWeightKg}`);
-  updateGoalWeightDisplay(goalWeightLbs, 'imperial');
+  setCookie('goal-weight-unit', 'imperial', 1);
+  console.log(`Goal weight lbs cookie updated: ${goalWeightLbs}`);
+  updateGoalWeightDisplay();
   updateGoalWeightDate();
   document.dispatchEvent(new Event('updateChartAndGoalDate'));
 }
 
-function updateGoalWeightDisplay(goalWeight, unit = 'metric') {
-  console.log('Updating goal weight display:', goalWeight, 'Unit:', unit);
+function getNormalizedGoalWeight() {
+  const unit = getCookie('goal-weight-unit');
+  if (unit === 'metric') {
+    return parseFloat(getCookie('goal-weight-kg'));
+  } else {
+    const weightLbs = parseFloat(getCookie('goal-weight-lbs'));
+    return weightLbs * 0.453592;
+  }
+}
+
+function updateGoalWeightDisplay() {
+  const unit = getCookie('goal-weight-unit');
+  let displayValue, displayUnit;
+  
+  if (unit === 'metric') {
+    displayValue = getCookie('goal-weight-kg');
+    displayUnit = 'kg';
+  } else {
+    displayValue = getCookie('goal-weight-lbs');
+    displayUnit = 'lbs';
+  }
+  
+  console.log('Updating goal weight display:', displayValue, displayUnit);
   document.querySelectorAll('[custom-data="show-goal-weight"]').forEach(goalWeightElement => {
-    if (unit === 'metric') {
-      goalWeightElement.textContent = `${goalWeight} kg`;
-    } else {
-      goalWeightElement.textContent = `${goalWeight} lbs`;
-    }
+    goalWeightElement.textContent = `${displayValue} ${displayUnit}`;
   });
   updateGoalWeightDate();
 }
 
 function updateGoalWeightDate() {
-  let weight, goalWeight;
-  const isMetric = document.querySelector('[custom-data="weight-kg"]') !== null;
+  const currentWeightKg = getNormalizedWeight();
+  const goalWeightKg = getNormalizedGoalWeight();
 
-  if (isMetric) {
-    weight = parseFloat(getCookie('weight-kg'));
-    goalWeight = parseFloat(getCookie('goal-weight-kg'));
-  } else {
-    weight = parseFloat(getCookie('weight-lbs'));
-    goalWeight = parseFloat(getCookie('goal-weight-lbs'));
-  }
+  console.log('Updating goal weight date. Current weight (kg):', currentWeightKg, 'Goal weight (kg):', goalWeightKg);
 
-  console.log('Updating goal weight date. Current weight:', weight, 'Goal weight:', goalWeight);
-
-  if (weight && goalWeight) {
-    const goalDate = calculateGoalWeightDate(weight, goalWeight, isMetric);
+  if (currentWeightKg && goalWeightKg) {
+    const goalDate = calculateGoalWeightDate(currentWeightKg, goalWeightKg);
     const currentDate = new Date();
     console.log('Calculated goal date:', goalDate);
 
@@ -471,18 +490,12 @@ function updateGoalWeightDate() {
   }
 }
 
-function calculateGoalWeightDate(weight, goalWeight, isMetric) {
-  console.log('Calculating goal date. Weight:', weight, 'Goal weight:', goalWeight, 'Is metric:', isMetric);
+function calculateGoalWeightDate(currentWeightKg, goalWeightKg) {
+  console.log('Calculating goal date. Current weight (kg):', currentWeightKg, 'Goal weight (kg):', goalWeightKg);
   
-  // Convert to kg if using imperial
-  if (!isMetric) {
-    weight = weight * 0.453592;
-    goalWeight = goalWeight * 0.453592;
-  }
-  
-  const isLosingWeight = weight > goalWeight;
+  const isLosingWeight = currentWeightKg > goalWeightKg;
   const weightChangePerWeek = isLosingWeight ? 0.75 : 0.3; // kg per week
-  const totalWeightChange = Math.abs(weight - goalWeight);
+  const totalWeightChange = Math.abs(currentWeightKg - goalWeightKg);
   const timeToGoalInWeeks = totalWeightChange / weightChangePerWeek;
   const currentDate = new Date();
   const goalDate = new Date(currentDate.getTime() + timeToGoalInWeeks * 7 * 24 * 60 * 60 * 1000);

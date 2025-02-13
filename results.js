@@ -168,34 +168,34 @@ function calculateRecommendedCalories(weight, goalWeight, totalDailyExpenditure)
   return totalDailyExpenditure + 250;
 }
 
-function displayRecommendedCalories() {
-  let weightKg, heightCm;
-  const isMetric = document.querySelector('[custom-data="weight-kg"]') !== null;
-
-  if (isMetric) {
-    weightKg = parseFloat(getCookie('weight-kg'));
-    heightCm = parseFloat(getCookie('height-cm'));
+function getNormalizedWeight() {
+  const unit = getCookie('weight-unit');
+  if (unit === 'metric') {
+    return parseFloat(getCookie('weight-kg'));
   } else {
     const weightLbs = parseFloat(getCookie('weight-lbs'));
-    const feet = parseFloat(getCookie('height-feet'));
-    const inches = parseFloat(getCookie('height-inches')) || 0;
-    
-    weightKg = weightLbs * 0.453592;
-    heightCm = (feet * 30.48) + (inches * 2.54);
+    return weightLbs * 0.453592;
   }
+}
 
+function getNormalizedGoalWeight() {
+  const unit = getCookie('goal-weight-unit');
+  if (unit === 'metric') {
+    return parseFloat(getCookie('goal-weight-kg'));
+  } else {
+    const weightLbs = parseFloat(getCookie('goal-weight-lbs'));
+    return weightLbs * 0.453592;
+  }
+}
+
+function displayRecommendedCalories() {
+  const weightKg = getNormalizedWeight();
+  const heightCm = parseFloat(getCookie('height-cm'));
   const age = parseInt(getCookie('age'));
   const gender = getCookie('gender');
-  let goalWeightKg;
-
-  if (isMetric) {
-    goalWeightKg = parseFloat(getCookie('goal-weight-kg'));
-  } else {
-    const goalWeightLbs = parseFloat(getCookie('goal-weight-lbs'));
-    goalWeightKg = goalWeightLbs * 0.453592;
-  }
-
+  const goalWeightKg = getNormalizedGoalWeight();
   const workouts = getCookie('weekly-workouts');
+
   console.log(`Weight: ${weightKg}kg, Height: ${heightCm}cm, Age: ${age}, Gender: ${gender}, Goal Weight: ${goalWeightKg}kg, Workouts: ${workouts}`);
 
   if (isNaN(weightKg) || isNaN(heightCm) || isNaN(age) || isNaN(goalWeightKg)) {
@@ -226,15 +226,8 @@ function displayRecommendedCalories() {
 }
 
 function displayWaterIntake() {
-  let weightKg;
-  const isMetric = document.querySelector('[custom-data="weight-kg"]') !== null;
-
-  if (isMetric) {
-    weightKg = parseFloat(getCookie('weight-kg'));
-  } else {
-    const weightLbs = parseFloat(getCookie('weight-lbs'));
-    weightKg = weightLbs * 0.453592;
-  }
+  const weightKg = getNormalizedWeight();
+  const unit = getCookie('weight-unit');
 
   console.log(`Weight for water calculation: ${weightKg} kg`);
   if (isNaN(weightKg)) {
@@ -247,7 +240,7 @@ function displayWaterIntake() {
 
   const waterResultElement = document.querySelector('[custom-data="water-result"]');
   if (waterResultElement) {
-    if (isMetric) {
+    if (unit === 'metric') {
       waterResultElement.textContent = dailyWaterLiters.toFixed(1); // Display liters with one decimal place
     } else {
       const dailyWaterOz = dailyWaterLiters * 33.814; // Convert liters to fluid ounces
@@ -281,15 +274,24 @@ function displayAdditionalData() {
   const workoutDuration = getCookie('workout-duration');
   const workoutLocation = getCookie('workout-location');
   const workoutFrequency = getCookie('weekly-workouts');
-  const currentWeight = getCookie('weight-kg');
-  const goalWeight = getCookie('goal-weight-kg');
+  const unit = getCookie('weight-unit');
+  let currentWeight, goalWeight;
+
+  if (unit === 'metric') {
+    currentWeight = getCookie('weight-kg') + ' kg';
+    goalWeight = getCookie('goal-weight-kg') + ' kg';
+  } else {
+    currentWeight = getCookie('weight-lbs') + ' lbs';
+    goalWeight = getCookie('goal-weight-lbs') + ' lbs';
+  }
+  
   const mainGoal = getCookie('main-goal');
 
   console.log(`Workout Duration from cookie: ${workoutDuration}`);
   console.log(`Workout Location from cookie: ${workoutLocation}`);
   console.log(`Workout Frequency from cookie: ${workoutFrequency}`);
-  console.log(`Current Weight from cookie: ${currentWeight}`);
-  console.log(`Goal Weight from cookie: ${goalWeight}`);
+  console.log(`Current Weight: ${currentWeight}`);
+  console.log(`Goal Weight: ${goalWeight}`);
   console.log(`Main Goal from cookie: ${mainGoal}`);
 
   const workoutDurationElement = document.querySelector('[custom-data="workout-duration"]');
