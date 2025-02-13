@@ -169,16 +169,37 @@ function calculateRecommendedCalories(weight, goalWeight, totalDailyExpenditure)
 }
 
 function displayRecommendedCalories() {
-  const weightKg = parseFloat(getCookie('weight-kg'));
-  const heightCm = parseFloat(getCookie('height-cm'));
+  let weightKg, heightCm;
+  const isMetric = document.querySelector('[custom-data="weight-kg"]') !== null;
+
+  if (isMetric) {
+    weightKg = parseFloat(getCookie('weight-kg'));
+    heightCm = parseFloat(getCookie('height-cm'));
+  } else {
+    const weightLbs = parseFloat(getCookie('weight-lbs'));
+    const feet = parseFloat(getCookie('height-feet'));
+    const inches = parseFloat(getCookie('height-inches')) || 0;
+    
+    weightKg = weightLbs * 0.453592;
+    heightCm = (feet * 30.48) + (inches * 2.54);
+  }
+
   const age = parseInt(getCookie('age'));
   const gender = getCookie('gender');
-  const goalWeightKg = parseFloat(getCookie('goal-weight-kg'));
+  let goalWeightKg;
+
+  if (isMetric) {
+    goalWeightKg = parseFloat(getCookie('goal-weight-kg'));
+  } else {
+    const goalWeightLbs = parseFloat(getCookie('goal-weight-lbs'));
+    goalWeightKg = goalWeightLbs * 0.453592;
+  }
+
   const workouts = getCookie('weekly-workouts');
   console.log(`Weight: ${weightKg}kg, Height: ${heightCm}cm, Age: ${age}, Gender: ${gender}, Goal Weight: ${goalWeightKg}kg, Workouts: ${workouts}`);
 
   if (isNaN(weightKg) || isNaN(heightCm) || isNaN(age) || isNaN(goalWeightKg)) {
-    console.log('One or more required cookies are invalid');
+    console.log('One or more required values are invalid');
     return;
   }
 
@@ -205,10 +226,19 @@ function displayRecommendedCalories() {
 }
 
 function displayWaterIntake() {
-  const weightKg = parseFloat(getCookie('weight-kg'));
-  console.log(`Weight from cookie: ${weightKg} kg`);
+  let weightKg;
+  const isMetric = document.querySelector('[custom-data="weight-kg"]') !== null;
+
+  if (isMetric) {
+    weightKg = parseFloat(getCookie('weight-kg'));
+  } else {
+    const weightLbs = parseFloat(getCookie('weight-lbs'));
+    weightKg = weightLbs * 0.453592;
+  }
+
+  console.log(`Weight for water calculation: ${weightKg} kg`);
   if (isNaN(weightKg)) {
-    console.log('Weight cookie is invalid');
+    console.log('Weight value is invalid');
     return;
   }
 
@@ -217,7 +247,12 @@ function displayWaterIntake() {
 
   const waterResultElement = document.querySelector('[custom-data="water-result"]');
   if (waterResultElement) {
-    waterResultElement.textContent = dailyWaterLiters.toFixed(1); // Display with one decimal place
+    if (isMetric) {
+      waterResultElement.textContent = dailyWaterLiters.toFixed(1); // Display liters with one decimal place
+    } else {
+      const dailyWaterOz = dailyWaterLiters * 33.814; // Convert liters to fluid ounces
+      waterResultElement.textContent = dailyWaterOz.toFixed(0); // Display ounces as whole number
+    }
   }
 
   const minLiters = 1.5; // Minimum recommended daily water intake

@@ -24,14 +24,48 @@ function formatDate(date) {
   return new Intl.DateTimeFormat('en-US', options).format(date);
 }
 
+// Unit conversion functions
+function convertImperialToMetric(feet, inches, pounds) {
+  const heightCm = (feet * 30.48) + (inches * 2.54);
+  const weightKg = pounds * 0.453592;
+  return { heightCm, weightKg };
+}
+
+function convertMetricToImperial(cm, kg) {
+  const totalInches = cm / 2.54;
+  const feet = Math.floor(totalInches / 12);
+  const inches = Math.round(totalInches % 12);
+  const pounds = Math.round(kg * 2.20462);
+  return { feet, inches, pounds };
+}
+
 // BMI calculation and updating functions
 function calculateBMI(heightCm, weightKg) {
   return weightKg / Math.pow(heightCm / 100, 2);
 }
 
 function updateBMI() {
-  const heightCm = parseFloat(getCookie('height-cm'));
-  const weightKg = parseFloat(getCookie('weight-kg'));
+  let heightCm, weightKg;
+
+  // Try to get metric values first
+  const metricHeight = parseFloat(getCookie('height-cm'));
+  const metricWeight = parseFloat(getCookie('weight-kg'));
+
+  // If metric values are not available, try imperial
+  if (isNaN(metricHeight) || isNaN(metricWeight)) {
+    const feet = parseFloat(getCookie('height-feet'));
+    const inches = parseFloat(getCookie('height-inches'));
+    const pounds = parseFloat(getCookie('weight-lbs'));
+
+    if (!isNaN(feet) && !isNaN(pounds)) {
+      const imperial = convertImperialToMetric(feet, inches || 0, pounds);
+      heightCm = imperial.heightCm;
+      weightKg = imperial.weightKg;
+    }
+  } else {
+    heightCm = metricHeight;
+    weightKg = metricWeight;
+  }
 
   console.log(`heightCm: ${heightCm}, weightKg: ${weightKg}`);
 
@@ -41,10 +75,10 @@ function updateBMI() {
     setCookie('bmi', bmi.toFixed(2), 1); // Save BMI to cookie
     updateBMIResults(bmi);
     updateBMIExplainers(bmi);
-    updateBodyVisualClass(bmi); // Update the body visual class based on BMI
+    updateBodyVisualClass(bmi);
     dispatchBMICalculatedEvent(bmi);
   } else {
-    console.log('Height or weight cookie not found or invalid');
+    console.log('Height or weight values not found or invalid');
   }
 }
 
@@ -236,8 +270,8 @@ function determineFitnessLevel(fitnessPoints) {
 
 // Event listeners setup functions
 function setupEventListeners() {
-  setupWeightInputListener();
-  setupHeightInputListener();
+  setupWeightInputListeners();
+  setupHeightInputListeners();
   setupGoalWeightInputListener();
   setupRadioButtonListeners();
   setupTextInputListeners();
@@ -246,30 +280,56 @@ function setupEventListeners() {
   document.addEventListener('bmiCalculated', updateBMIIndicatorPosition);
 }
 
-function setupWeightInputListener() {
-  const weightInput = document.querySelector('[custom-data="weight-kg"]');
-  if (weightInput) {
-    weightInput.addEventListener('input', handleWeightInputChange);
-  } else {
-    console.log('Weight input not found');
+function setupWeightInputListeners() {
+  // Metric weight input
+  const weightKgInput = document.querySelector('[custom-data="weight-kg"]');
+  if (weightKgInput) {
+    weightKgInput.addEventListener('input', handleWeightKgInputChange);
+  }
+
+  // Imperial weight input
+  const weightLbsInput = document.querySelector('[custom-data="weight-lbs"]');
+  if (weightLbsInput) {
+    weightLbsInput.addEventListener('input', handleWeightLbsInputChange);
   }
 }
 
-function handleWeightInputChange() {
-  const weight = this.value;
-  setCookie('weight-kg', weight, 1);
-  console.log(`Weight cookie updated: ${weight}`);
+function handleWeightKgInputChange() {
+  const weightKg = this.value;
+  setCookie('weight-kg', weightKg, 1);
+  console.log(`Weight kg cookie updated: ${weightKg}`);
   updateBMI();
-  updateGoalWeightDate(); 
+  updateGoalWeightDate();
   document.dispatchEvent(new Event('updateChartAndGoalDate'));
 }
 
-function setupHeightInputListener() {
+function handleWeightLbsInputChange() {
+  const weightLbs = this.value;
+  const weightKg = weightLbs * 0.453592;
+  setCookie('weight-lbs', weightLbs, 1);
+  setCookie('weight-kg', weightKg.toFixed(2), 1);
+  console.log(`Weight lbs cookie updated: ${weightLbs}, converted to kg: ${weightKg}`);
+  updateBMI();
+  updateGoalWeightDate();
+  document.dispatchEvent(new Event('updateChartAndGoalDate'));
+}
+
+function setupHeightInputListeners() {
+  // Metric height input
   const heightCmInput = document.querySelector('[custom-data="height-cm"]');
   if (heightCmInput) {
     heightCmInput.addEventListener('input', handleHeightCmInputChange);
-  } else {
-    console.log('Height input not found');
+  }
+
+  // Imperial height inputs
+  const heightFtInput = document.querySelector('[custom-data="height-feet"]');
+  const heightInInput = document.querySelector('[custom-data="height-inches"]');
+  
+  if (heightFtInput) {
+    heightFtInput.addEventListener('input', handleHeightImperialInputChange);
+  }
+  if (heightInInput) {
+    heightInInput.addEventListener('input', handleHeightImperialInputChange);
   }
 }
 
@@ -281,31 +341,83 @@ function handleHeightCmInputChange() {
   document.dispatchEvent(new Event('updateChartAndGoalDate'));
 }
 
-function setupGoalWeightInputListener() {
-  const goalWeightInput = document.querySelector('[custom-data="goal-weight-kg"]');
-  if (goalWeightInput) {
-    goalWeightInput.addEventListener('input', handleGoalWeightInputChange);
-  } else {
-    console.log('Goal weight input not found');
+function handleHeightImperialInputChange() {
+  const feet = parseFloat(document.querySelector('[custom-data="height-feet"]')?.value || 0);
+  const inches = parseFloat(document.querySelector('[custom-data="height-inches"]')?.value || 0);
+  
+  if (!isNaN(feet)) {
+    const heightCm = (feet * 30.48) + (inches * 2.54);
+    setCookie('height-feet', feet, 1);
+    setCookie('height-inches', inches, 1);
+    setCookie('height-cm', heightCm.toFixed(2), 1);
+    console.log(`Height imperial cookie updated: ${feet}'${inches}", converted to cm: ${heightCm}`);
+    updateBMI();
+    document.dispatchEvent(new Event('updateChartAndGoalDate'));
   }
 }
 
-function handleGoalWeightInputChange() {
-  const goalWeight = this.value;
-  setCookie('goal-weight-kg', goalWeight, 1);
-  console.log(`Goal weight cookie updated: ${goalWeight}`);
-  updateGoalWeightDisplay(goalWeight);
+function setupGoalWeightInputListener() {
+  // Metric goal weight input
+  const goalWeightKgInput = document.querySelector('[custom-data="goal-weight-kg"]');
+  if (goalWeightKgInput) {
+    goalWeightKgInput.addEventListener('input', handleGoalWeightKgInputChange);
+  }
+
+  // Imperial goal weight input
+  const goalWeightLbsInput = document.querySelector('[custom-data="goal-weight-lbs"]');
+  if (goalWeightLbsInput) {
+    goalWeightLbsInput.addEventListener('input', handleGoalWeightLbsInputChange);
+  }
+}
+
+function handleGoalWeightKgInputChange() {
+  const goalWeightKg = this.value;
+  setCookie('goal-weight-kg', goalWeightKg, 1);
+  console.log(`Goal weight kg cookie updated: ${goalWeightKg}`);
+  updateGoalWeightDisplay(goalWeightKg, 'metric');
   updateGoalWeightDate();
   document.dispatchEvent(new Event('updateChartAndGoalDate'));
 }
 
+function handleGoalWeightLbsInputChange() {
+  const goalWeightLbs = this.value;
+  const goalWeightKg = goalWeightLbs * 0.453592;
+  setCookie('goal-weight-lbs', goalWeightLbs, 1);
+  setCookie('goal-weight-kg', goalWeightKg.toFixed(2), 1);
+  console.log(`Goal weight lbs cookie updated: ${goalWeightLbs}, converted to kg: ${goalWeightKg}`);
+  updateGoalWeightDisplay(goalWeightLbs, 'imperial');
+  updateGoalWeightDate();
+  document.dispatchEvent(new Event('updateChartAndGoalDate'));
+}
+
+function updateGoalWeightDisplay(goalWeight, unit = 'metric') {
+  console.log('Updating goal weight display:', goalWeight, 'Unit:', unit);
+  document.querySelectorAll('[custom-data="show-goal-weight"]').forEach(goalWeightElement => {
+    if (unit === 'metric') {
+      goalWeightElement.textContent = `${goalWeight} kg`;
+    } else {
+      goalWeightElement.textContent = `${goalWeight} lbs`;
+    }
+  });
+  updateGoalWeightDate();
+}
+
 function updateGoalWeightDate() {
-  const weight = parseFloat(getCookie('weight-kg'));
-  const goalWeight = parseFloat(getCookie('goal-weight-kg'));
+  let weight, goalWeight;
+  const isMetric = document.querySelector('[custom-data="weight-kg"]') !== null;
+
+  if (isMetric) {
+    weight = parseFloat(getCookie('weight-kg'));
+    goalWeight = parseFloat(getCookie('goal-weight-kg'));
+  } else {
+    weight = parseFloat(getCookie('weight-lbs'));
+    goalWeight = parseFloat(getCookie('goal-weight-lbs'));
+  }
+
   console.log('Updating goal weight date. Current weight:', weight, 'Goal weight:', goalWeight);
 
   if (weight && goalWeight) {
-    const goalDate = calculateGoalWeightDate(weight, goalWeight);
+    const goalDate = calculateGoalWeightDate(weight, goalWeight, isMetric);
     const currentDate = new Date();
     console.log('Calculated goal date:', goalDate);
 
@@ -332,46 +444,17 @@ function updateGoalWeightDate() {
   }
 }
 
-function updateGoalWeightDisplay(goalWeight) {
-  console.log('Updating goal weight display:', goalWeight);
-  document.querySelectorAll('[custom-data="show-goal-weight"]').forEach(goalWeightElement => {
-    goalWeightElement.textContent = `${goalWeight} kg`;
-  });
-  updateGoalWeightDate();
-  const weight = parseFloat(getCookie('weight-kg'));
-  console.log('Current weight:', weight);
-  if (weight && goalWeight) {
-    const goalDate = calculateGoalWeightDate(weight, parseFloat(goalWeight));
-    const currentDate = new Date();
-    console.log('Goal date:', goalDate);
-    console.log('Current date:', currentDate);
-
-    // Format the date for display
-    let displayDate;
-    if (goalDate.getFullYear() === currentDate.getFullYear()) {
-      displayDate = goalDate.toLocaleDateString('es-ES', { month: 'long', day: 'numeric' });
-    } else {
-      displayDate = goalDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
-    }
-    console.log('Display date:', displayDate);
-
-    // Store the full date string in the cookie
-    const fullDateString = goalDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    setCookie('goal-weight-date', fullDateString, 1);
-
-    document.querySelectorAll('[custom-data="goal-weight-date"]').forEach(goalWeightDateElement => {
-      goalWeightDateElement.textContent = `Fecha objetivo: ${displayDate}`;
-      console.log('Set goal weight date element text to:', displayDate);
-    });
-  } else {
-    console.log('Weight or goal weight is missing');
+function calculateGoalWeightDate(weight, goalWeight, isMetric) {
+  console.log('Calculating goal date. Weight:', weight, 'Goal weight:', goalWeight, 'Is metric:', isMetric);
+  
+  // Convert to kg if using imperial
+  if (!isMetric) {
+    weight = weight * 0.453592;
+    goalWeight = goalWeight * 0.453592;
   }
-}
-
-function calculateGoalWeightDate(weight, goalWeight) {
-  console.log('Calculating goal date. Weight:', weight, 'Goal weight:', goalWeight);
+  
   const isLosingWeight = weight > goalWeight;
-  const weightChangePerWeek = isLosingWeight ? 0.75 : 0.3; // Adjusted for kg
+  const weightChangePerWeek = isLosingWeight ? 0.75 : 0.3; // kg per week
   const totalWeightChange = Math.abs(weight - goalWeight);
   const timeToGoalInWeeks = totalWeightChange / weightChangePerWeek;
   const currentDate = new Date();
@@ -416,11 +499,11 @@ function updateMetabolismDisplay() {
   });
 
   let metabolismElement;
-  if (bodyType === 'Endomorfo') {
+  if (bodyType === 'Endomorph' || bodyType === 'Endomorfo') {
     metabolismElement = document.querySelector('[custom-data="metabolism-endomorph"]');
-  } else if (bodyType === 'Mesomorfo') {
+  } else if (bodyType === 'Mesomorph' || bodyType === 'Mesomorfo') {
     metabolismElement = document.querySelector('[custom-data="metabolism-mesomorph"]');
-  } else if (bodyType === 'Ectomorfo') {
+  } else if (bodyType === 'Ectomorph' || bodyType === 'Ectomorfo') {
     metabolismElement = document.querySelector('[custom-data="metabolism-ectomorph"]');
   }
 
