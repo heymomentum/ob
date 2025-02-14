@@ -57,7 +57,8 @@ function displayBodyFatPercentage() {
 
 function displayFitnessLevel() {
   const fitnessLevel = getCookie('fitness-level');
-  console.log(`Fitness Level from cookie: ${fitnessLevel}`);
+  const fitnessLevelEs = getCookie('fitness-level-es');
+  console.log(`Fitness Level from cookies - EN: ${fitnessLevel}, ES: ${fitnessLevelEs}`);
   let filledBars = 0;
 
   switch (fitnessLevel?.toLowerCase()) {
@@ -68,10 +69,10 @@ function displayFitnessLevel() {
       filledBars = 3;
       break;
     case 'intermediate':
-      filledBars = 1;
+      filledBars = 2;
       break;
     case 'basic':
-      filledBars = 0;
+      filledBars = 1;
       break;
     default:
       filledBars = 0;
@@ -88,9 +89,16 @@ function displayFitnessLevel() {
     }
   }
 
+  // Update English display
   const showFitnessLevelElement = document.querySelector('[custom-data="show-fitness-level"]');
   if (showFitnessLevelElement) {
     showFitnessLevelElement.textContent = fitnessLevel;
+  }
+
+  // Update Spanish display
+  const showFitnessLevelEsElement = document.querySelector('[custom-data="show-fitness-level-es"]');
+  if (showFitnessLevelEsElement) {
+    showFitnessLevelEsElement.textContent = fitnessLevelEs;
   }
 }
 

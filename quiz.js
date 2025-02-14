@@ -178,11 +178,12 @@ function updateFitnessLevel() {
   if (pullUpsValue !== null && workoutFrequencyValue !== null) {
     const fitnessPoints = calculateFitnessPoints(pullUpsValue, workoutFrequencyValue);
     const fitnessLevel = determineFitnessLevel(fitnessPoints);
-    setCookie('fitness-level', fitnessLevel, 1);
+    setCookie('fitness-level', fitnessLevel.en, 1);
+    setCookie('fitness-level-es', fitnessLevel.es, 1);
 
-    // Update text display
+    // Update text display for both languages
     document.querySelectorAll('[custom-data="fitness-level"]').forEach(fitnessLevelElement => {
-      fitnessLevelElement.textContent = fitnessLevel;
+      fitnessLevelElement.textContent = fitnessLevel.en;
     });
 
     // Hide all fitness level explanations first
@@ -192,7 +193,7 @@ function updateFitnessLevel() {
 
     // Show the appropriate fitness level explanation
     let fitnessLevelElement;
-    switch (fitnessLevel) {
+    switch (fitnessLevel.en) {
       case 'Excellent':
         fitnessLevelElement = document.querySelector('[custom-data="fitness-level-excellent"]');
         break;
@@ -212,7 +213,7 @@ function updateFitnessLevel() {
     }
 
     // Update the fitness level bars (existing functionality)
-    updateFitnessLevelBar(fitnessLevel);
+    updateFitnessLevelBar(fitnessLevel.en);
   }
 }
 
@@ -285,13 +286,13 @@ function calculateFitnessPoints(pullUpsValue, workoutFrequencyValue) {
 
 function determineFitnessLevel(fitnessPoints) {
   if (fitnessPoints >= 5) {
-    return 'Excellent';
+    return { en: 'Excellent', es: 'Excelente' };
   } else if (fitnessPoints === 4) {
-    return 'Good';
+    return { en: 'Good', es: 'Bueno' };
   } else if (fitnessPoints >= 2) {
-    return 'Intermediate';
+    return { en: 'Intermediate', es: 'Intermedio' };
   } else {
-    return 'Basic';
+    return { en: 'Basic', es: 'Básico' };
   }
 }
 
