@@ -68,10 +68,10 @@ function displayFitnessLevel() {
       filledBars = 3;
       break;
     case 'intermediate':
-      filledBars = 2;
+      filledBars = 1;
       break;
     case 'basic':
-      filledBars = 1;
+      filledBars = 0;
       break;
     default:
       filledBars = 0;
