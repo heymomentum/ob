@@ -62,19 +62,19 @@ function displayFitnessLevel() {
 
   switch (fitnessLevel?.toLowerCase()) {
     case 'excellent':
-      filledBars = 5;
-      break;
-    case 'good':
       filledBars = 4;
       break;
-    case 'intermediate':
+    case 'good':
       filledBars = 3;
       break;
-    case 'basic':
+    case 'intermediate':
       filledBars = 2;
       break;
-    default:
+    case 'basic':
       filledBars = 1;
+      break;
+    default:
+      filledBars = 0;
   }
 
   for (let i = 1; i <= 5; i++) {
