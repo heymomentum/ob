@@ -267,25 +267,19 @@ document.addEventListener('click', function(event) {
 document.addEventListener('DOMContentLoaded', async function() {
     console.log('Form tracking and API reporting initialized');
     
-    // Do the initial form data collection and API submission once
-    const initialFormData = trackFormValues();
-    try {
-        await sendDataToApi(initialFormData);
-        console.log('Initial form data sent successfully');
-    } catch (error) {
-        console.error('Error sending initial form data:', error);
-    }
-    
-    // Set up the form redirects without periodic updates
-    updateSubmitRedirects();
-    
-    // Determine default API endpoint based on domain
+    // Determine default API endpoint based on domain FIRST
     const currentDomain = window.location.hostname;
     const defaultEndpoint = (currentDomain === 'try-momentum.com' || currentDomain === 'www.try-momentum.com')
         ? 'https://o37rcsefc3.execute-api.us-east-1.amazonaws.com/production/api/onboarding/qst'
         : 'https://4bropw3xnc.execute-api.eu-central-1.amazonaws.com/development/api/onboarding/qst';
     
     console.log(`Form data will be reported to: ${defaultEndpoint}`);
+    
+    // Set the endpoint in session storage immediately if not already set
+    if (!sessionStorage.getItem(ENDPOINT_STORAGE_KEY)) {
+        sessionStorage.setItem(ENDPOINT_STORAGE_KEY, defaultEndpoint);
+        console.log('API endpoint initialized in session storage');
+    }
 
     // Create input container
     const inputContainer = document.createElement('div');
@@ -328,12 +322,21 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     if (savedEndpoint && endpointInput) {
         endpointInput.value = savedEndpoint;
-    } else if (endpointInput) {
-        // Save initial value to session storage
-        sessionStorage.setItem(ENDPOINT_STORAGE_KEY, endpointInput.value);
     }
     
-    // Replay cached submissions
+    // Now that the endpoint is guaranteed to be set up, do the initial form submission
+    const initialFormData = trackFormValues();
+    try {
+        await sendDataToApi(initialFormData);
+        console.log('Initial form data sent successfully');
+    } catch (error) {
+        console.error('Error sending initial form data:', error);
+    }
+    
+    // Set up the form redirects without periodic updates
+    updateSubmitRedirects();
+    
+    // Replay cached submissions last
     replayCachedSubmissions();
     
     console.log('URL input initialized:', inputContainer);
