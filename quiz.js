@@ -467,23 +467,39 @@ function updateGoalWeightDate() {
     const currentDate = new Date();
     console.log('Calculated goal date:', goalDate);
 
-    // Format the date for display
-    let displayDate;
+    // Format the date for English
+    let englishDisplayDate;
     if (goalDate.getFullYear() === currentDate.getFullYear()) {
-      displayDate = goalDate.toLocaleDateString('es-ES', { month: 'long', day: 'numeric' });
+      englishDisplayDate = goalDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
     } else {
-      displayDate = goalDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+      englishDisplayDate = goalDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     }
-    console.log('Display date:', displayDate);
 
-    // Store the full date string in the cookie
+    // Format the date for Spanish
+    let spanishDisplayDate;
+    if (goalDate.getFullYear() === currentDate.getFullYear()) {
+      spanishDisplayDate = goalDate.toLocaleDateString('es-ES', { month: 'long', day: 'numeric' });
+    } else {
+      spanishDisplayDate = goalDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+    }
+
+    console.log('Display dates - English:', englishDisplayDate, 'Spanish:', spanishDisplayDate);
+
+    // Store the full date string in the cookie (keep in English format for consistency)
     const fullDateString = goalDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     setCookie('goal-weight-date', fullDateString, 1);
     console.log('Goal weight date cookie updated:', fullDateString);
 
-    document.querySelectorAll('[custom-data="goal-weight-date"]').forEach(goalWeightDateElement => {
-      goalWeightDateElement.textContent = `${displayDate}`;
-      console.log('Set goal weight date element text to:', displayDate);
+    // Update English elements
+    document.querySelectorAll('[custom-data="goal-weight-date"]').forEach(element => {
+      element.textContent = englishDisplayDate;
+      console.log('Set English goal weight date element text to:', englishDisplayDate);
+    });
+
+    // Update Spanish elements
+    document.querySelectorAll('[custom-data="goal-weight-date-es"]').forEach(element => {
+      element.textContent = spanishDisplayDate;
+      console.log('Set Spanish goal weight date element text to:', spanishDisplayDate);
     });
   } else {
     console.log('Weight or goal weight is missing');

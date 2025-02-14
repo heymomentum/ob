@@ -60,17 +60,17 @@ function displayFitnessLevel() {
   console.log(`Fitness Level from cookie: ${fitnessLevel}`);
   let filledBars = 0;
 
-  switch (fitnessLevel) {
-    case 'Excelente':
+  switch (fitnessLevel?.toLowerCase()) {
+    case 'excellent':
       filledBars = 5;
       break;
-    case 'Buena':
+    case 'good':
       filledBars = 4;
       break;
-    case 'Intermedio':
+    case 'intermediate':
       filledBars = 3;
       break;
-    case 'Básica':
+    case 'basic':
       filledBars = 2;
       break;
     default:
