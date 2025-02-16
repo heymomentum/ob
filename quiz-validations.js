@@ -121,9 +121,11 @@ class FormValidator {
             if (isValid) {
                 button.classList.remove('disabled');
                 button.style.opacity = '';
+                button.style.pointerEvents = 'auto';
             } else {
                 button.classList.add('disabled');
                 button.style.opacity = '0.4';
+                button.style.pointerEvents = 'none';
             }
         });
 
