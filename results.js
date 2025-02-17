@@ -220,7 +220,7 @@ function displayRecommendedCalories() {
 
   const caloriesResultElement = document.querySelector('[custom-data="calories-result"]');
   if (caloriesResultElement) {
-    caloriesResultElement.textContent = recommendedCalories.toFixed(0);
+    caloriesResultElement.textContent = recommendedCalories.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   }
 
   const caloriePercentage = ((recommendedCalories - 1000) / 2000) * 100;
