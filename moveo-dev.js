@@ -2,6 +2,18 @@
 const ENDPOINT_STORAGE_KEY = 'momentum-api-endpoint';
 const FORM_DATA_STORAGE_KEY = 'momentum-form-data-cache';
 
+// Utility function to get cookie value
+function getCookie(name) {
+  const nameEQ = name + "=";
+  const ca = document.cookie.split(';');
+  for (let i = 0; i < ca.length; i++) {
+    let c = ca[i];
+    while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+    if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+  }
+  return null;
+}
+
 // Initialize session storage for API reports
 let formDataCache = [];
 try {
@@ -13,111 +25,101 @@ try {
 
 // Function to update form submit button redirects based on domain
 function updateSubmitRedirects() {
+    const name = document.getElementById('name-input')?.value || getCookie('name-input');
+    const email = document.getElementById('email-input')?.value || getCookie('email-input');
+    
     const currentDomain = window.location.hostname;
     const baseUrl = (currentDomain === 'try-momentum.com' || currentDomain === 'www.try-momentum.com')
         ? 'https://main.d2bzdkijpstiae.amplifyapp.com/payment-screen'
         : 'https://06ec4bbec5dd.ngrok.app/payment-screen';
-
-    console.log('Current domain:', currentDomain);
-    console.log('Selected baseUrl:', baseUrl);
-
-    // Get name and email from form data or cookies
-    const formData = trackFormValues();
-    const name = formData.name || getCookie('name-input') || null;
-    const email = formData.email || getCookie('email-input') || null;
-
-    // Create the query string with null values if empty
-    const queryString = `?firstName=${name || 'null'}&lastName=null&fullName=null&email=${email || 'null'}`;
     
-    // Combine base URL with query string
-    const fullUrl = baseUrl + queryString;
-
-    // Update form handling
+    console.log("Name from cookie or input:", name);
+    console.log("Email from cookie or input:", email);
+    
+    // Base query string without offer
+    const baseQueryString = `?firstName=${name || 'null'}&lastName=null&fullName=null&email=${email || 'null'}`;
+    
+    // 1. Handle submit buttons with the submit-button class
+    const submitButtons = document.querySelectorAll('.submit-button');
+    submitButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            window.location.href = baseUrl + baseQueryString;
+        });
+    });
+    
+    // 2. Handle the pricing forms specifically
     document.querySelectorAll('#wf-form-Pricing-Top, #wf-form-Pricing-Bottom').forEach(form => {
-        form.setAttribute('redirect', baseUrl);
-        form.setAttribute('data-redirect', baseUrl);
+        // Add submit event listener to the form
+        form.addEventListener('submit', function(e) {
+            // Prevent the default form submission
+            e.preventDefault();
+            
+            // Get the selected offer from the form
+            const selectedOffer = form.querySelector('input[name="offer"]:checked')?.value || '';
+            
+            // Create the full query string with the offer
+            const queryString = baseQueryString + (selectedOffer ? `&offer=${selectedOffer}` : '');
+            const fullUrl = baseUrl + queryString;
+            
+            console.log('Form submitted, redirecting to:', fullUrl);
+            
+            // Update the form's redirect attributes with the full URL including query parameters
+            form.setAttribute('redirect', fullUrl);
+            form.setAttribute('data-redirect', fullUrl);
+            
+            // Force redirect to the full URL with query parameters
+            window.location.href = fullUrl;
+            return false; // Ensure the form doesn't submit normally
+        });
         
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            console.log('Form submitted:', form.id);
-            
-            // Collect form data from ONLY this form
-            const formFields = {};
-            const formElements = form.elements;
-            
-            // Debug radio buttons state
-            console.log('Radio buttons in form:', form.id);
-            form.querySelectorAll('input[type="radio"]').forEach(radio => {
-                console.log(`Radio ${radio.id}: value=${radio.value}, checked=${radio.checked}`);
-            });
-            
-            // Specifically handle radio button selection
-            const selectedRadio = form.querySelector('input[type="radio"]:checked');
-            if (selectedRadio) {
-                console.log('Selected radio button:', selectedRadio.id, selectedRadio.value);
-                formFields[selectedRadio.name] = selectedRadio.value;
-            }
-            
-            // Add other form elements
-            for (let i = 0; i < formElements.length; i++) {
-                const element = formElements[i];
-                if (element.name && element.value && element.type !== 'radio') {
-                    formFields[element.name] = element.value;
-                }
-            }
-            
-            console.log('Form fields collected:', formFields);
-            
-            // Add form identifier
-            formFields.formId = form.id;
-            
-            // Get tracked form data but exclude fields that exist in this form
-            const trackedData = trackFormValues();
-            console.log('Initial tracked data:', trackedData);
-            
-            Object.keys(formFields).forEach(key => {
-                delete trackedData[key];
-            });
-            console.log('Tracked data after removal:', trackedData);
-            
-            // Merge data, prioritizing the submitted form's values
-            const allData = {
-                ...trackedData,
-                ...formFields,
-                pricingForm: formFields
-            };
-            console.log('Final merged data:', allData);
-            
-            try {
-                // Send data to API
-                await sendDataToApi(allData);
-                console.log('Pricing form data sent successfully');
-                console.log('Redirecting to:', fullUrl);
+        // Also handle the submit button within the form directly
+        const formSubmitBtn = form.querySelector('input[type="submit"]');
+        if (formSubmitBtn) {
+            formSubmitBtn.addEventListener('click', function(e) {
+                // Prevent the default button click behavior
+                e.preventDefault();
                 
-                // Redirect after successful submission
+                // Get the selected offer from the form
+                const selectedOffer = form.querySelector('input[name="offer"]:checked')?.value || '';
+                
+                // Create the full query string with the offer
+                const queryString = baseQueryString + (selectedOffer ? `&offer=${selectedOffer}` : '');
+                const fullUrl = baseUrl + queryString;
+                
+                console.log('Submit button clicked, redirecting to:', fullUrl);
+                
+                // Force redirect to the full URL with query parameters
                 window.location.href = fullUrl;
-            } catch (error) {
-                console.error('Error sending pricing form data:', error);
-                // Still redirect even if API call fails
-                window.location.href = fullUrl;
-            }
-        });
+                return false; // Ensure the form doesn't submit normally
+            });
+        }
     });
-
-    // Update submit buttons (as backup)
-    document.querySelectorAll('[data-form="submit-btn"][data-pricing-form="true"]').forEach(button => {
-        button.addEventListener('click', async (e) => {
+    
+    // 3. Also add direct event listeners to all submit buttons with class .base-button.pricing-button
+    document.querySelectorAll('.base-button.pricing-button').forEach(button => {
+        button.addEventListener('click', function(e) {
+            // Prevent the default button click behavior
             e.preventDefault();
+            
+            // Find the parent form
             const form = button.closest('form');
-            if (form) {
-                form.dispatchEvent(new Event('submit'));
-            } else {
-                window.location.href = fullUrl;
-            }
+            if (!form) return;
+            
+            // Get the selected offer from the form
+            const selectedOffer = form.querySelector('input[name="offer"]:checked')?.value || '';
+            
+            // Create the full query string with the offer
+            const queryString = baseQueryString + (selectedOffer ? `&offer=${selectedOffer}` : '');
+            const fullUrl = baseUrl + queryString;
+            
+            console.log('Pricing button clicked, redirecting to:', fullUrl);
+            
+            // Force redirect to the full URL with query parameters
+            window.location.href = fullUrl;
+            return false;
         });
     });
-
-    console.log('Updated form redirects with URL:', fullUrl);
 }
 
 // Replace periodicLinkUpdate with periodicSubmitUpdate
@@ -335,6 +337,20 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     // Set up the form redirects without periodic updates
     updateSubmitRedirects();
+    
+    // Add a debug log to check if forms are found
+    const pricingForms = document.querySelectorAll('#wf-form-Pricing-Top, #wf-form-Pricing-Bottom');
+    console.log(`Found ${pricingForms.length} pricing forms:`, pricingForms);
+    
+    // Add a debug log for radio buttons
+    pricingForms.forEach(form => {
+        const radioButtons = form.querySelectorAll('input[type="radio"]');
+        console.log(`Form ${form.id} has ${radioButtons.length} radio buttons:`, radioButtons);
+        
+        // Log the selected radio button
+        const selectedRadio = form.querySelector('input[type="radio"]:checked');
+        console.log(`Form ${form.id} selected radio:`, selectedRadio?.value || 'none');
+    });
     
     // Replay cached submissions last
     replayCachedSubmissions();
