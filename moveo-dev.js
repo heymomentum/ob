@@ -58,8 +58,8 @@ function updateSubmitRedirects() {
             // Get the selected offer from the form
             const selectedOffer = form.querySelector('input[name="offer"]:checked')?.value || '';
             
-            // Create the full query string with the offer
-            const queryString = baseQueryString + (selectedOffer ? `&offer=${selectedOffer}` : '');
+            // Create the full query string with the offerId
+            const queryString = baseQueryString + (selectedOffer ? `&offerId=${selectedOffer}` : '');
             const fullUrl = baseUrl + queryString;
             
             console.log('Form submitted, redirecting to:', fullUrl);
@@ -83,8 +83,8 @@ function updateSubmitRedirects() {
                 // Get the selected offer from the form
                 const selectedOffer = form.querySelector('input[name="offer"]:checked')?.value || '';
                 
-                // Create the full query string with the offer
-                const queryString = baseQueryString + (selectedOffer ? `&offer=${selectedOffer}` : '');
+                // Create the full query string with the offerId
+                const queryString = baseQueryString + (selectedOffer ? `&offerId=${selectedOffer}` : '');
                 const fullUrl = baseUrl + queryString;
                 
                 console.log('Submit button clicked, redirecting to:', fullUrl);
@@ -109,8 +109,8 @@ function updateSubmitRedirects() {
             // Get the selected offer from the form
             const selectedOffer = form.querySelector('input[name="offer"]:checked')?.value || '';
             
-            // Create the full query string with the offer
-            const queryString = baseQueryString + (selectedOffer ? `&offer=${selectedOffer}` : '');
+            // Create the full query string with the offerId
+            const queryString = baseQueryString + (selectedOffer ? `&offerId=${selectedOffer}` : '');
             const fullUrl = baseUrl + queryString;
             
             console.log('Pricing button clicked, redirecting to:', fullUrl);
