@@ -31,7 +31,8 @@ function updateSubmitRedirects() {
     const currentDomain = window.location.hostname;
     const baseUrl = (currentDomain === 'try-momentum.com' || currentDomain === 'www.try-momentum.com')
         ? 'https://main.d2bzdkijpstiae.amplifyapp.com/payment-screen'
-        : 'https://06ec4bbec5dd.ngrok.app/payment-screen';
+        : 'https://dev.d2bzdkijpstiae.amplifyapp.com/payment-screen/';
+        // Switch to: "https://06ec4bbec5dd.ngrok.app/payment-screen" for spanish on dev
     
     console.log("Name from cookie or input:", name);
     console.log("Email from cookie or input:", email);
