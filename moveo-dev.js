@@ -31,7 +31,7 @@ function updateSubmitRedirects() {
     const currentDomain = window.location.hostname;
     const baseUrl = (currentDomain === 'try-momentum.com' || currentDomain === 'www.try-momentum.com')
         ? 'https://main.d2bzdkijpstiae.amplifyapp.com/payment-screen'
-        : 'https://dev.d2bzdkijpstiae.amplifyapp.com/payment-screen/';
+        : 'https://06ec4bbec5dd.ngrok.app/payment-screen';
         // Switch to: "https://06ec4bbec5dd.ngrok.app/payment-screen" for spanish on dev
     
     console.log("Name from cookie or input:", name);
@@ -52,7 +52,7 @@ function updateSubmitRedirects() {
     // 2. Handle the pricing forms specifically
     document.querySelectorAll('#wf-form-Pricing-Top, #wf-form-Pricing-Bottom').forEach(form => {
         // Add submit event listener to the form
-        form.addEventListener('submit', function(e) {
+        form.addEventListener('submit', async function(e) {
             // Prevent the default form submission
             e.preventDefault();
             
@@ -63,21 +63,80 @@ function updateSubmitRedirects() {
             const queryString = baseQueryString + (selectedOffer ? `&offerId=${selectedOffer}` : '');
             const fullUrl = baseUrl + queryString;
             
-            console.log('Form submitted, redirecting to:', fullUrl);
+            console.log('Form submitted:', form.id);
             
-            // Update the form's redirect attributes with the full URL including query parameters
-            form.setAttribute('redirect', fullUrl);
-            form.setAttribute('data-redirect', fullUrl);
+            // Collect form data from ONLY this form
+            const formFields = {};
+            const formElements = form.elements;
             
-            // Force redirect to the full URL with query parameters
-            window.location.href = fullUrl;
+            // Debug radio buttons state
+            console.log('Radio buttons in form:', form.id);
+            form.querySelectorAll('input[type="radio"]').forEach(radio => {
+                console.log(`Radio ${radio.id}: value=${radio.value}, checked=${radio.checked}`);
+            });
+            
+            // Specifically handle radio button selection
+            const selectedRadio = form.querySelector('input[type="radio"]:checked');
+            if (selectedRadio) {
+                console.log('Selected radio button:', selectedRadio.id, selectedRadio.value);
+                formFields[selectedRadio.name] = selectedRadio.value;
+            }
+            
+            // Add other form elements
+            for (let i = 0; i < formElements.length; i++) {
+                const element = formElements[i];
+                if (element.name && element.value && element.type !== 'radio') {
+                    formFields[element.name] = element.value;
+                }
+            }
+            
+            console.log('Form fields collected:', formFields);
+            
+            // Add form identifier
+            formFields.formId = form.id;
+            
+            // Get tracked form data but exclude fields that exist in this form
+            const trackedData = trackFormValues();
+            console.log('Initial tracked data:', trackedData);
+            
+            Object.keys(formFields).forEach(key => {
+                delete trackedData[key];
+            });
+            console.log('Tracked data after removal:', trackedData);
+            
+            // Merge data, prioritizing the submitted form's values
+            const allData = {
+                ...trackedData,
+                ...formFields,
+                pricingForm: formFields
+            };
+            console.log('Final merged data:', allData);
+            
+            try {
+                // Send data to API
+                await sendDataToApi(allData);
+                console.log('Pricing form data sent successfully');
+                console.log('Redirecting to:', fullUrl);
+                
+                // Update the form's redirect attributes with the full URL including query parameters
+                form.setAttribute('redirect', fullUrl);
+                form.setAttribute('data-redirect', fullUrl);
+                
+                // Force redirect to the full URL with query parameters
+                window.location.href = fullUrl;
+            } catch (error) {
+                console.error('Error sending pricing form data:', error);
+                // Still redirect even if API call fails
+                window.location.href = fullUrl;
+            }
+            
             return false; // Ensure the form doesn't submit normally
         });
         
         // Also handle the submit button within the form directly
         const formSubmitBtn = form.querySelector('input[type="submit"]');
         if (formSubmitBtn) {
-            formSubmitBtn.addEventListener('click', function(e) {
+            formSubmitBtn.addEventListener('click', async function(e) {
                 // Prevent the default button click behavior
                 e.preventDefault();
                 
@@ -89,6 +148,29 @@ function updateSubmitRedirects() {
                 const fullUrl = baseUrl + queryString;
                 
                 console.log('Submit button clicked, redirecting to:', fullUrl);
+                
+                // Collect and send form data before redirect
+                const formFields = {
+                    formId: form.id
+                };
+                
+                if (selectedOffer) {
+                    formFields.offer = selectedOffer;
+                }
+                
+                const trackedData = trackFormValues();
+                const allData = {
+                    ...trackedData,
+                    ...formFields,
+                    pricingForm: formFields
+                };
+                
+                try {
+                    await sendDataToApi(allData);
+                    console.log('Form data sent successfully on button click');
+                } catch (error) {
+                    console.error('Error sending form data on button click:', error);
+                }
                 
                 // Force redirect to the full URL with query parameters
                 window.location.href = fullUrl;
