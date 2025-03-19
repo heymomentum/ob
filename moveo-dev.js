@@ -44,8 +44,8 @@ function updateSubmitRedirects() {
     
     const currentDomain = window.location.hostname;
     const baseUrl = (currentDomain === 'try-momentum.com' || currentDomain === 'www.try-momentum.com')
-        ? 'https://65e9c3b7e57e.ngrok.app/payment-screen'
-        : 'https://06ec4bbec5dd.ngrok.app/payment-screen';
+        ? 'https://www.app.try-momentum.com/payment-screen'
+        : 'https://65e9c3b7e57e.ngrok.app/payment-screen';
         // Switch to: "https://www.app.try-momentum.com/payment-screen" for main site
     
     console.log("Name from cookie or input:", name);
