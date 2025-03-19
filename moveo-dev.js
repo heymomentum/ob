@@ -14,6 +14,20 @@ function getCookie(name) {
   return null;
 }
 
+// Conversion utility functions for metric/imperial units
+function lbsToKg(lbs) {
+  if (!lbs || isNaN(lbs)) return null;
+  return Math.round((parseFloat(lbs) * 0.453592) * 10) / 10; // Round to 1 decimal place
+}
+
+function feetInchesToCm(feet, inches) {
+  if ((feet === null || isNaN(feet)) && (inches === null || isNaN(inches))) return null;
+  feet = parseFloat(feet || 0);
+  inches = parseFloat(inches || 0);
+  const totalInches = (feet * 12) + inches;
+  return Math.round(totalInches * 2.54); // Round to whole number
+}
+
 // Initialize session storage for API reports
 let formDataCache = [];
 try {
@@ -95,22 +109,24 @@ function updateSubmitRedirects() {
             // Add form identifier
             formFields.formId = form.id;
             
-            // Get tracked form data but exclude fields that exist in this form
+            // Get tracked form data - with universal metrics only
             const trackedData = trackFormValues();
-            console.log('Initial tracked data:', trackedData);
+            console.log('Form tracked data with universal metrics:', trackedData);
             
-            Object.keys(formFields).forEach(key => {
-                delete trackedData[key];
-            });
-            console.log('Tracked data after removal:', trackedData);
-            
-            // Merge data, prioritizing the submitted form's values
+            // Merge form fields with tracked data, preserving universal metrics
             const allData = {
                 ...trackedData,
                 ...formFields,
-                pricingForm: formFields
+                pricingForm: {
+                    ...formFields,
+                    // Include universal metrics in the pricing form data if they exist
+                    ...(trackedData['uni-weight'] && { 'uni-weight': trackedData['uni-weight'] }),
+                    ...(trackedData['uni-height'] && { 'uni-height': trackedData['uni-height'] }),
+                    ...(trackedData['uni-goal-weight'] && { 'uni-goal-weight': trackedData['uni-goal-weight'] })
+                }
             };
-            console.log('Final merged data:', allData);
+            
+            console.log('Final merged data with universal metrics:', allData);
             
             try {
                 // Send data to API
@@ -149,7 +165,7 @@ function updateSubmitRedirects() {
                 
                 console.log('Submit button clicked, redirecting to:', fullUrl);
                 
-                // Collect and send form data before redirect
+                // Collect form data
                 const formFields = {
                     formId: form.id
                 };
@@ -158,11 +174,18 @@ function updateSubmitRedirects() {
                     formFields.offer = selectedOffer;
                 }
                 
+                // Get tracked data with universal metrics only
                 const trackedData = trackFormValues();
                 const allData = {
                     ...trackedData,
                     ...formFields,
-                    pricingForm: formFields
+                    pricingForm: {
+                        ...formFields,
+                        // Include universal metrics in the pricing form data if they exist
+                        ...(trackedData['uni-weight'] && { 'uni-weight': trackedData['uni-weight'] }),
+                        ...(trackedData['uni-height'] && { 'uni-height': trackedData['uni-height'] }),
+                        ...(trackedData['uni-goal-weight'] && { 'uni-goal-weight': trackedData['uni-goal-weight'] })
+                    }
                 };
                 
                 try {
@@ -211,9 +234,10 @@ function periodicSubmitUpdate() {
     // Remove the setTimeout to prevent continuous updates
 }
 
-// Modified trackFormValues function
+// Modified trackFormValues function to extract universal metrics only
 function trackFormValues() {
-    const formData = {};
+    // First collect all cookies into a temporary object
+    const tempData = {};
     
     // Get all cookies
     const cookies = document.cookie.split(';');
@@ -225,51 +249,121 @@ function trackFormValues() {
         // Skip empty cookies
         if (!value || value === 'null' || value === '') return;
         
-        // Handle universal value cookies (ending with -uni)
-        if (name.endsWith('-uni')) {
-            // Store the universal value and skip the rest of the loop
-            const baseKey = name.replace('-uni', '');
-            formData[baseKey] = value;
-            return;
-        }
-        
-        // Handle special case for input fields that might have -input suffix
+        // Handle input fields that might have -input suffix
         if (name.endsWith('-input')) {
             name = name.replace('-input', '');
         }
         
-        // Skip if we already have a universal value for this field
-        if (formData[name]) return;
-        
         // Handle array fields (comma-separated values)
         if (value.includes(',')) {
-            formData[name] = value.split(',').map(v => v.trim());
+            tempData[name] = value.split(',').map(v => v.trim());
         } else {
             // Handle numeric values
             if (!isNaN(value) && value.trim() !== '') {
-                formData[name] = parseFloat(value);
+                tempData[name] = parseFloat(value);
             } else {
-                formData[name] = value;
+                tempData[name] = value;
             }
         }
     });
 
-    // Map specific fields for backward compatibility
-    const fieldMapping = {
-        'weight-lbs': 'Weight',
-        'height-feet': 'Height-Feet',
-        'height-inches': 'Height-Inches',
-        'goal-weight-lbs': 'goal-weight'
-    };
-
-    // Create mapped fields without removing original ones
-    Object.entries(fieldMapping).forEach(([oldKey, newKey]) => {
-        if (formData[oldKey] !== undefined) {
-            formData[newKey] = formData[oldKey];
+    // Create the final form data object with universal values
+    const formData = {};
+    
+    // Find all universal keys (-uni suffix) for filtering
+    const universalKeys = Object.keys(tempData).filter(key => key.endsWith('-uni'));
+    const universalPrefixes = universalKeys.map(key => key.replace('-uni', ''));
+    
+    // Track which fields were filtered out due to having universal versions
+    const filteredOutFields = [];
+    
+    // List of health metric keys that we'll handle separately
+    const healthMetricKeys = [
+        'weight-lbs', 'Weight', 'weight-kg',
+        'goal-weight-lbs', 'goal-weight', 'goal-weight-kg',
+        'height-feet', 'Height-Feet', 'height-inches', 'Height-Inches', 'height-cm',
+        'weight-unit', 'goal-weight-unit', 'height-unit'
+    ];
+    
+    // Process all keys from tempData
+    Object.keys(tempData).forEach(key => {
+        // Skip health metrics we're going to handle separately
+        if (healthMetricKeys.includes(key)) {
+            return;
         }
+        
+        // If this is a universal key, always include it
+        if (key.endsWith('-uni')) {
+            formData[key] = tempData[key];
+            return;
+        }
+        
+        // If we have a universal version of this key (key + '-uni'), skip the non-universal version
+        if (universalPrefixes.includes(key) && tempData[key + '-uni'] !== undefined) {
+            // Track which fields we're filtering out
+            filteredOutFields.push(key);
+            return;
+        }
+        
+        // Include this key since it either doesn't have a universal version
+        // or the universal version doesn't exist in the cookies
+        formData[key] = tempData[key];
     });
+    
+    // Extract and normalize weight
+    let uniWeight = null;
+    if (tempData['weight-kg'] !== undefined) {
+        // Use metric weight directly
+        uniWeight = tempData['weight-kg'];
+    } else if (tempData['weight-lbs'] !== undefined || tempData['Weight'] !== undefined) {
+        // Convert imperial weight
+        const weightLbs = tempData['weight-lbs'] || tempData['Weight'];
+        uniWeight = lbsToKg(weightLbs);
+    }
+    
+    // Extract and normalize goal weight
+    let uniGoalWeight = null;
+    if (tempData['goal-weight-kg'] !== undefined) {
+        // Use metric goal weight directly
+        uniGoalWeight = tempData['goal-weight-kg'];
+    } else if (tempData['goal-weight-lbs'] !== undefined || tempData['goal-weight'] !== undefined) {
+        // Convert imperial goal weight
+        const goalWeightLbs = tempData['goal-weight-lbs'] || tempData['goal-weight'];
+        uniGoalWeight = lbsToKg(goalWeightLbs);
+    }
+    
+    // Extract and normalize height
+    let uniHeight = null;
+    if (tempData['height-cm'] !== undefined) {
+        // Use metric height directly
+        uniHeight = tempData['height-cm'];
+    } else if ((tempData['height-feet'] !== undefined || tempData['Height-Feet'] !== undefined) && 
+              (tempData['height-inches'] !== undefined || tempData['Height-Inches'] !== undefined)) {
+        // Convert imperial height
+        const feet = tempData['height-feet'] || tempData['Height-Feet'];
+        const inches = tempData['height-inches'] || tempData['Height-Inches'];
+        uniHeight = feetInchesToCm(feet, inches);
+    }
+    
+    // Add universal values to final form data if they exist
+    if (uniWeight !== null) {
+        formData['uni-weight'] = uniWeight;
+    }
+    
+    if (uniGoalWeight !== null) {
+        formData['uni-goal-weight'] = uniGoalWeight;
+    }
+    
+    if (uniHeight !== null) {
+        formData['uni-height'] = uniHeight;
+    }
 
-    console.log('Final form data:', formData);
+    // Debug logging to show which fields were filtered out
+    if (filteredOutFields.length > 0) {
+        console.log('Filtered out non-universal values that have universal counterparts:', filteredOutFields);
+    }
+
+    console.log('Final form data with only universal metrics:', formData);
     return formData;
 }
 
@@ -283,10 +377,11 @@ async function sendDataToApi(formData) {
         return;
     }
     
+    // Create a filtered version of the data that only includes universal metrics
     const data = { data: formData };
     
     try {
-        console.log('Sending data to API:', data);
+        console.log('Sending data to API (with universal metrics only):', data);
         const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
@@ -409,6 +504,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         endpointInput.value = savedEndpoint;
     }
     
+    // Set up event listeners for health metric inputs
+    setupHealthMetricEventListeners();
+    
     // Now that the endpoint is guaranteed to be set up, do the initial form submission
     const initialFormData = trackFormValues();
     try {
@@ -440,6 +538,196 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     console.log('URL input initialized:', inputContainer);
 });
+
+// Function to set universal cookie values
+function setUniversalMetrics(metricType, value) {
+    if (!value || value === 'null' || isNaN(value)) return;
+    
+    // Set expiration to 30 days
+    const expiryDate = new Date();
+    expiryDate.setTime(expiryDate.getTime() + (30 * 24 * 60 * 60 * 1000));
+    const expires = "expires=" + expiryDate.toUTCString();
+    
+    if (metricType === 'weight') {
+        document.cookie = `uni-weight=${value};${expires};path=/`;
+        console.log(`Set universal weight to ${value}kg`);
+    } else if (metricType === 'height') {
+        document.cookie = `uni-height=${value};${expires};path=/`;
+        console.log(`Set universal height to ${value}cm`);
+    } else if (metricType === 'goal-weight') {
+        document.cookie = `uni-goal-weight=${value};${expires};path=/`;
+        console.log(`Set universal goal-weight to ${value}kg`);
+    }
+}
+
+// Function to set up event listeners for health metric inputs
+function setupHealthMetricEventListeners() {
+    // Check for existing cookies first and set universal metrics
+    checkExistingCookiesForMetrics();
+    
+    // Add event listeners for weight fields
+    document.querySelectorAll('input[id*="weight"], input[name*="weight"]').forEach(field => {
+        if (field.type === 'number' || field.type === 'text') {
+            field.addEventListener('change', function(e) {
+                // Check if this is a kg or lbs field
+                const isMetric = field.id.includes('-kg') || field.name.includes('-kg');
+                const value = parseFloat(e.target.value);
+                
+                if (!isNaN(value)) {
+                    if (isMetric) {
+                        // Metric value can be used directly
+                        setUniversalMetrics('weight', value);
+                    } else {
+                        // Imperial value needs conversion
+                        const weightKg = lbsToKg(value);
+                        if (weightKg) {
+                            setUniversalMetrics('weight', weightKg);
+                        }
+                    }
+                }
+            });
+        }
+    });
+    
+    // Add event listeners for goal weight fields
+    document.querySelectorAll('input[id*="goal-weight"], input[name*="goal-weight"]').forEach(field => {
+        if (field.type === 'number' || field.type === 'text') {
+            field.addEventListener('change', function(e) {
+                // Check if this is a kg or lbs field
+                const isMetric = field.id.includes('-kg') || field.name.includes('-kg');
+                const value = parseFloat(e.target.value);
+                
+                if (!isNaN(value)) {
+                    if (isMetric) {
+                        // Metric value can be used directly
+                        setUniversalMetrics('goal-weight', value);
+                    } else {
+                        // Imperial value needs conversion
+                        const goalWeightKg = lbsToKg(value);
+                        if (goalWeightKg) {
+                            setUniversalMetrics('goal-weight', goalWeightKg);
+                        }
+                    }
+                }
+            });
+        }
+    });
+    
+    // Add event listeners for height fields
+    // Handle height-cm fields
+    document.querySelectorAll('input[id*="height-cm"], input[name*="height-cm"]').forEach(field => {
+        if (field.type === 'number' || field.type === 'text') {
+            field.addEventListener('change', function(e) {
+                const value = parseFloat(e.target.value);
+                if (!isNaN(value)) {
+                    setUniversalMetrics('height', value);
+                }
+            });
+        }
+    });
+    
+    // Handle feet and inches fields
+    document.querySelectorAll('input[id*="height-feet"], input[name*="height-feet"]').forEach(field => {
+        if (field.type === 'number' || field.type === 'text') {
+            field.addEventListener('change', function(e) {
+                // Find the related inches field
+                const feetFieldId = field.id;
+                const relatedInchesFieldSelector = feetFieldId.replace('feet', 'inches');
+                const inchesField = document.getElementById(relatedInchesFieldSelector);
+                
+                if (inchesField) {
+                    const feet = parseFloat(e.target.value) || 0;
+                    const inches = parseFloat(inchesField.value) || 0;
+                    
+                    const heightCm = feetInchesToCm(feet, inches);
+                    if (heightCm) {
+                        setUniversalMetrics('height', heightCm);
+                    }
+                }
+            });
+        }
+    });
+    
+    document.querySelectorAll('input[id*="height-inches"], input[name*="height-inches"]').forEach(field => {
+        if (field.type === 'number' || field.type === 'text') {
+            field.addEventListener('change', function(e) {
+                // Find the related feet field
+                const inchesFieldId = field.id;
+                const relatedFeetFieldSelector = inchesFieldId.replace('inches', 'feet');
+                const feetField = document.getElementById(relatedFeetFieldSelector);
+                
+                if (feetField) {
+                    const feet = parseFloat(feetField.value) || 0;
+                    const inches = parseFloat(e.target.value) || 0;
+                    
+                    const heightCm = feetInchesToCm(feet, inches);
+                    if (heightCm) {
+                        setUniversalMetrics('height', heightCm);
+                    }
+                }
+            });
+        }
+    });
+    
+    console.log('Set up event listeners for health metric inputs');
+}
+
+// Function to check for existing cookies and set universal metrics
+function checkExistingCookiesForMetrics() {
+    console.log('Checking for existing health metric cookies...');
+    
+    // Check for weight cookies
+    const weightKg = getCookie('weight-kg');
+    const weightLbs = getCookie('weight-lbs') || getCookie('Weight');
+    
+    if (weightKg) {
+        // Use metric weight directly
+        setUniversalMetrics('weight', parseFloat(weightKg));
+        console.log('Found existing weight-kg cookie:', weightKg);
+    } else if (weightLbs) {
+        // Convert imperial weight
+        const weightKgValue = lbsToKg(parseFloat(weightLbs));
+        if (weightKgValue) {
+            setUniversalMetrics('weight', weightKgValue);
+            console.log('Converted weight-lbs to kg:', weightLbs, 'to', weightKgValue);
+        }
+    }
+    
+    // Check for goal weight cookies
+    const goalWeightKg = getCookie('goal-weight-kg');
+    const goalWeightLbs = getCookie('goal-weight-lbs') || getCookie('goal-weight');
+    
+    if (goalWeightKg) {
+        // Use metric goal weight directly
+        setUniversalMetrics('goal-weight', parseFloat(goalWeightKg));
+        console.log('Found existing goal-weight-kg cookie:', goalWeightKg);
+    } else if (goalWeightLbs) {
+        // Convert imperial goal weight
+        const goalWeightKgValue = lbsToKg(parseFloat(goalWeightLbs));
+        if (goalWeightKgValue) {
+            setUniversalMetrics('goal-weight', goalWeightKgValue);
+            console.log('Converted goal-weight-lbs to kg:', goalWeightLbs, 'to', goalWeightKgValue);
+        }
+    }
+    
+    // Check for height cookies
+    const heightCm = getCookie('height-cm');
+    const heightFeet = getCookie('height-feet') || getCookie('Height-Feet');
+    const heightInches = getCookie('height-inches') || getCookie('Height-Inches');
+    
+    if (heightCm) {
+        // Use metric height directly
+        setUniversalMetrics('height', parseFloat(heightCm));
+        console.log('Found existing height-cm cookie:', heightCm);
+    } else if (heightFeet && heightInches) {
+        // Convert imperial height
+        const heightCmValue = feetInchesToCm(parseFloat(heightFeet), parseFloat(heightInches));
+        if (heightCmValue) {
+            setUniversalMetrics('height', heightCmValue);
+            console.log('Converted height from feet/inches to cm:', heightFeet, heightInches, 'to', heightCmValue);
+        }
+    }
+}
 
 // Modified keyboard shortcut handler
 document.addEventListener('keydown', function(event) {

@@ -270,17 +270,44 @@ function trackFormValues() {
     // Create the final form data object with universal values
     const formData = {};
     
-    // Copy all non-health metric data directly
+    // Find all universal keys (-uni suffix) for filtering
+    const universalKeys = Object.keys(tempData).filter(key => key.endsWith('-uni'));
+    const universalPrefixes = universalKeys.map(key => key.replace('-uni', ''));
+    
+    // Track which fields were filtered out due to having universal versions
+    const filteredOutFields = [];
+    
+    // List of health metric keys that we'll handle separately
+    const healthMetricKeys = [
+        'weight-lbs', 'Weight', 'weight-kg',
+        'goal-weight-lbs', 'goal-weight', 'goal-weight-kg',
+        'height-feet', 'Height-Feet', 'height-inches', 'Height-Inches', 'height-cm',
+        'weight-unit', 'goal-weight-unit', 'height-unit'
+    ];
+    
+    // Process all keys from tempData
     Object.keys(tempData).forEach(key => {
-        // Skip all the metric cookies we're going to normalize
-        if (![
-            'weight-lbs', 'Weight', 'weight-kg',
-            'goal-weight-lbs', 'goal-weight', 'goal-weight-kg',
-            'height-feet', 'Height-Feet', 'height-inches', 'Height-Inches', 'height-cm',
-            'weight-unit', 'goal-weight-unit', 'height-unit'
-        ].includes(key)) {
-            formData[key] = tempData[key];
+        // Skip health metrics we're going to handle separately
+        if (healthMetricKeys.includes(key)) {
+            return;
         }
+        
+        // If this is a universal key, always include it
+        if (key.endsWith('-uni')) {
+            formData[key] = tempData[key];
+            return;
+        }
+        
+        // If we have a universal version of this key (key + '-uni'), skip the non-universal version
+        if (universalPrefixes.includes(key) && tempData[key + '-uni'] !== undefined) {
+            // Track which fields we're filtering out
+            filteredOutFields.push(key);
+            return;
+        }
+        
+        // Include this key since it either doesn't have a universal version
+        // or the universal version doesn't exist in the cookies
+        formData[key] = tempData[key];
     });
     
     // Extract and normalize weight
@@ -329,6 +356,11 @@ function trackFormValues() {
     
     if (uniHeight !== null) {
         formData['uni-height'] = uniHeight;
+    }
+
+    // Debug logging to show which fields were filtered out
+    if (filteredOutFields.length > 0) {
+        console.log('Filtered out non-universal values that have universal counterparts:', filteredOutFields);
     }
 
     console.log('Final form data with only universal metrics:', formData);
