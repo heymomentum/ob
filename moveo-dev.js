@@ -45,14 +45,26 @@ function updateSubmitRedirects() {
     const currentDomain = window.location.hostname;
     const baseUrl = (currentDomain === 'try-momentum.com' || currentDomain === 'www.try-momentum.com')
         ? 'https://www.app.try-momentum.com/payment-screen'
-        : 'https://65e9c3b7e57e.ngrok.app/payment-screen';
+        : 'https://dev.d2bzdkijpstiae.amplifyapp.com/payment-screen';
         // Switch to: "https://www.app.try-momentum.com/payment-screen" for main site
     
     console.log("Name from cookie or input:", name);
     console.log("Email from cookie or input:", email);
     
+    // Detect language from URL path
+    const urlPath = window.location.pathname;
+    let language = "en"; // Default language
+    
+    if (urlPath.includes("/es/")) {
+        language = "es";
+    } else if (urlPath.includes("/en/")) {
+        language = "en";
+    }
+    
+    console.log("Detected language from URL path:", language);
+    
     // Base query string without offer
-    const baseQueryString = `?firstName=${name || 'null'}&lastName=null&fullName=null&email=${email || 'null'}`;
+    const baseQueryString = `?firstName=${name || 'null'}&lastName=null&fullName=null&email=${email || 'null'}&lang=${language}`;
     
     // 1. Handle submit buttons with the submit-button class
     const submitButtons = document.querySelectorAll('.submit-button');
