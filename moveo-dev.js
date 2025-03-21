@@ -64,7 +64,7 @@ function updateSubmitRedirects() {
     console.log("Detected language from URL path:", language);
     
     // Base query string without offer
-    const baseQueryString = `?firstName=${name || 'null'}&lastName=null&fullName=null&email=${email || 'null'}&lang=${language}`;
+    const baseQueryString = `?firstName=${encodeURIComponent(name || 'null')}&lastName=null&fullName=null&email=${encodeURIComponent(email || 'null')}&lang=${language}`;
     
     // 1. Handle submit buttons with the submit-button class
     const submitButtons = document.querySelectorAll('.submit-button');
