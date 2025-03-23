@@ -6,7 +6,7 @@
 // Check if the URL contains '/results/' and push 'add_to_cart' event to dataLayer
 document.addEventListener('DOMContentLoaded', function() {
   // Check if the current URL contains '/results/'
-  if (window.location.pathname.includes('/results/')) {
+  if (window.location.pathname.includes('/results')) {
     console.log('Results page detected, pushing add_to_cart event to dataLayer');
     
     // Ensure dataLayer is initialized
