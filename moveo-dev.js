@@ -152,9 +152,6 @@ function updateSubmitRedirects() {
                 form.setAttribute('redirect', fullUrl);
                 form.setAttribute('data-redirect', fullUrl);
                 
-                // Hide loader before redirect
-                hideFormLoader(form);
-                
                 // Only redirect after confirming data was sent successfully
                 console.log('Data confirmed sent. Redirecting to:', fullUrl);
                 window.location.href = fullUrl;
@@ -219,9 +216,6 @@ function updateSubmitRedirects() {
                     // Send data to API and wait for complete response
                     const apiResponse = await sendDataToApi(allData);
                     console.log('Form data sent successfully on button click with response:', apiResponse);
-                    
-                    // Hide loader before redirect
-                    hideFormLoader(form);
                     
                     // Only redirect after confirming data was sent successfully
                     console.log('Data confirmed sent. Redirecting to:', fullUrl);
@@ -292,9 +286,6 @@ function updateSubmitRedirects() {
                 // Send data to API and wait for complete response
                 const apiResponse = await sendDataToApi(allData);
                 console.log('Pricing button data sent successfully with response:', apiResponse);
-                
-                // Hide loader before redirect
-                hideFormLoader(form);
                 
                 // Only redirect after confirming data was sent successfully
                 console.log('Data confirmed sent. Redirecting to:', fullUrl);
