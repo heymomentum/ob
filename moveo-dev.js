@@ -82,6 +82,9 @@ function updateSubmitRedirects() {
             // Prevent the default form submission
             e.preventDefault();
             
+            // Show the loader immediately
+            showFormLoader(form);
+            
             // Get the selected offer from the form
             const selectedOffer = form.querySelector('input[name="offer"]:checked')?.value || '';
             
@@ -141,21 +144,30 @@ function updateSubmitRedirects() {
             console.log('Final merged data with universal metrics:', allData);
             
             try {
-                // Send data to API
-                await sendDataToApi(allData);
-                console.log('Pricing form data sent successfully');
-                console.log('Redirecting to:', fullUrl);
+                // Send data to API and wait for the complete response
+                const apiResponse = await sendDataToApi(allData);
+                console.log('Pricing form data sent successfully with response:', apiResponse);
                 
                 // Update the form's redirect attributes with the full URL including query parameters
                 form.setAttribute('redirect', fullUrl);
                 form.setAttribute('data-redirect', fullUrl);
                 
-                // Force redirect to the full URL with query parameters
+                // Hide loader before redirect
+                hideFormLoader(form);
+                
+                // Only redirect after confirming data was sent successfully
+                console.log('Data confirmed sent. Redirecting to:', fullUrl);
                 window.location.href = fullUrl;
             } catch (error) {
                 console.error('Error sending pricing form data:', error);
-                // Still redirect even if API call fails
-                window.location.href = fullUrl;
+                
+                // Hide loader if there was an error
+                hideFormLoader(form);
+                
+                // Show an error message to the user - can be customized
+                if (confirm('There was an error sending your data. Would you like to continue anyway?')) {
+                    window.location.href = fullUrl;
+                }
             }
             
             return false; // Ensure the form doesn't submit normally
@@ -167,6 +179,9 @@ function updateSubmitRedirects() {
             formSubmitBtn.addEventListener('click', async function(e) {
                 // Prevent the default button click behavior
                 e.preventDefault();
+                
+                // Show the loader immediately
+                showFormLoader(form);
                 
                 // Get the selected offer from the form
                 const selectedOffer = form.querySelector('input[name="offer"]:checked')?.value || '';
@@ -201,14 +216,28 @@ function updateSubmitRedirects() {
                 };
                 
                 try {
-                    await sendDataToApi(allData);
-                    console.log('Form data sent successfully on button click');
+                    // Send data to API and wait for complete response
+                    const apiResponse = await sendDataToApi(allData);
+                    console.log('Form data sent successfully on button click with response:', apiResponse);
+                    
+                    // Hide loader before redirect
+                    hideFormLoader(form);
+                    
+                    // Only redirect after confirming data was sent successfully
+                    console.log('Data confirmed sent. Redirecting to:', fullUrl);
+                    window.location.href = fullUrl;
                 } catch (error) {
                     console.error('Error sending form data on button click:', error);
+                    
+                    // Hide loader if there was an error
+                    hideFormLoader(form);
+                    
+                    // Show an error message to the user - can be customized
+                    if (confirm('There was an error sending your data. Would you like to continue anyway?')) {
+                        window.location.href = fullUrl;
+                    }
                 }
                 
-                // Force redirect to the full URL with query parameters
-                window.location.href = fullUrl;
                 return false; // Ensure the form doesn't submit normally
             });
         }
@@ -216,13 +245,16 @@ function updateSubmitRedirects() {
     
     // 3. Also add direct event listeners to all submit buttons with class .base-button.pricing-button
     document.querySelectorAll('.base-button.pricing-button').forEach(button => {
-        button.addEventListener('click', function(e) {
+        button.addEventListener('click', async function(e) {
             // Prevent the default button click behavior
             e.preventDefault();
             
             // Find the parent form
             const form = button.closest('form');
             if (!form) return;
+            
+            // Show the loader immediately
+            showFormLoader(form);
             
             // Get the selected offer from the form
             const selectedOffer = form.querySelector('input[name="offer"]:checked')?.value || '';
@@ -231,10 +263,54 @@ function updateSubmitRedirects() {
             const queryString = baseQueryString + (selectedOffer ? `&offerId=${selectedOffer}` : '');
             const fullUrl = baseUrl + queryString;
             
-            console.log('Pricing button clicked, redirecting to:', fullUrl);
+            console.log('Pricing button clicked:', fullUrl);
             
-            // Force redirect to the full URL with query parameters
-            window.location.href = fullUrl;
+            // Collect form data
+            const formFields = {
+                formId: form.id
+            };
+            
+            if (selectedOffer) {
+                formFields.offer = selectedOffer;
+            }
+            
+            // Get tracked data with universal metrics only
+            const trackedData = trackFormValues();
+            const allData = {
+                ...trackedData,
+                ...formFields,
+                pricingForm: {
+                    ...formFields,
+                    // Include universal metrics in the pricing form data if they exist
+                    ...(trackedData['uni-weight'] && { 'uni-weight': trackedData['uni-weight'] }),
+                    ...(trackedData['uni-height'] && { 'uni-height': trackedData['uni-height'] }),
+                    ...(trackedData['uni-goal-weight'] && { 'uni-goal-weight': trackedData['uni-goal-weight'] })
+                }
+            };
+            
+            try {
+                // Send data to API and wait for complete response
+                const apiResponse = await sendDataToApi(allData);
+                console.log('Pricing button data sent successfully with response:', apiResponse);
+                
+                // Hide loader before redirect
+                hideFormLoader(form);
+                
+                // Only redirect after confirming data was sent successfully
+                console.log('Data confirmed sent. Redirecting to:', fullUrl);
+                window.location.href = fullUrl;
+            } catch (error) {
+                console.error('Error sending data from pricing button:', error);
+                
+                // Hide loader if there was an error
+                hideFormLoader(form);
+                
+                // Show an error message to the user - can be customized
+                if (confirm('There was an error sending your data. Would you like to continue anyway?')) {
+                    window.location.href = fullUrl;
+                }
+            }
+            
             return false;
         });
     });
@@ -386,7 +462,7 @@ async function sendDataToApi(formData) {
     
     if (!apiUrl) {
         console.log('No API endpoint found');
-        return;
+        throw new Error('No API endpoint found');
     }
     
     // Create a filtered version of the data that only includes universal metrics
@@ -401,6 +477,11 @@ async function sendDataToApi(formData) {
             },
             body: JSON.stringify(data)
         });
+        
+        if (!response.ok) {
+            throw new Error(`API returned status: ${response.status}`);
+        }
+        
         const result = await response.json();
         console.log('API Response:', result);
         
@@ -411,8 +492,11 @@ async function sendDataToApi(formData) {
         }];
         sessionStorage.setItem(FORM_DATA_STORAGE_KEY, JSON.stringify(formDataCache));
         
+        // Return the result to the caller
+        return result;
     } catch (error) {
         console.error('API Error:', error);
+        throw error; // Re-throw to let caller handle it
     }
 }
 
@@ -425,14 +509,19 @@ async function logFormData() {
     if (isProcessing) return;
     isProcessing = true;
     
-    const formData = trackFormValues();
-    console.log('Current Form Data:', JSON.stringify(formData, null, 2));
-    await sendDataToApi(formData);
-    
-    // Reset the processing flag after delay
-    setTimeout(() => {
-        isProcessing = false;
-    }, DEBOUNCE_DELAY);
+    try {
+        const formData = trackFormValues();
+        console.log('Current Form Data:', JSON.stringify(formData, null, 2));
+        await sendDataToApi(formData);
+        console.log('Form data logged and sent successfully');
+    } catch (error) {
+        console.error('Error in logFormData:', error);
+    } finally {
+        // Reset the processing flag after delay
+        setTimeout(() => {
+            isProcessing = false;
+        }, DEBOUNCE_DELAY);
+    }
 }
 
 // Add click event listeners to next/submit buttons and radio inputs
@@ -522,8 +611,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Now that the endpoint is guaranteed to be set up, do the initial form submission
     const initialFormData = trackFormValues();
     try {
-        await sendDataToApi(initialFormData);
-        console.log('Initial form data sent successfully');
+        const initialResponse = await sendDataToApi(initialFormData);
+        console.log('Initial form data sent successfully with response:', initialResponse);
     } catch (error) {
         console.error('Error sending initial form data:', error);
     }
@@ -770,8 +859,60 @@ async function replayCachedSubmissions() {
             }
         }
         
-        await sendDataToApi(lastSubmission.data);
+        try {
+            const replayResponse = await sendDataToApi(lastSubmission.data);
+            console.log('Cached submission replayed successfully with response:', replayResponse);
+        } catch (error) {
+            console.error('Error replaying cached submission:', error);
+        }
     } else {
         console.log('No cached submissions to replay');
+    }
+}
+
+// Function to show the form loader
+function showFormLoader(form) {
+    // Find the loader element within the form or in the document
+    let loader = form ? form.querySelector('.form-loader') : document.querySelector('.form-question.form-loader.dark-mode');
+    
+    // If no loader found in the form, try to find it in the document
+    if (!loader) {
+        loader = document.querySelector('.form-question.form-loader.dark-mode');
+    }
+    
+    if (loader) {
+        // Store original display state if needed
+        if (!loader.dataset.originalDisplay) {
+            loader.dataset.originalDisplay = loader.style.display || 'none';
+        }
+        
+        // Show the loader
+        loader.style.display = 'flex';
+        console.log('Form loader shown');
+    } else {
+        console.warn('Form loader element not found');
+    }
+}
+
+// Function to hide the form loader
+function hideFormLoader(form) {
+    // Find the loader element within the form or in the document
+    let loader = form ? form.querySelector('.form-loader') : document.querySelector('.form-question.form-loader.dark-mode');
+    
+    // If no loader found in the form, try to find it in the document
+    if (!loader) {
+        loader = document.querySelector('.form-question.form-loader.dark-mode');
+    }
+    
+    if (loader) {
+        // Restore original display or hide
+        if (loader.dataset.originalDisplay && loader.dataset.originalDisplay !== 'none') {
+            loader.style.display = loader.dataset.originalDisplay;
+        } else {
+            loader.style.display = 'none';
+        }
+        console.log('Form loader hidden');
+    } else {
+        console.warn('Form loader element not found');
     }
 }
