@@ -75,6 +75,28 @@ function updateSubmitRedirects() {
         });
     });
     
+    // Handle browser back button - reset radio buttons state
+    window.addEventListener('pageshow', function(event) {
+        // Check if the page is being loaded from the browser cache (back button navigation)
+        if (event.persisted) {
+            console.log('Page was loaded from cache (back button). Resetting form state...');
+            
+            // Reset all radio buttons in pricing forms
+            document.querySelectorAll('#wf-form-Pricing-Top input[type="radio"], #wf-form-Pricing-Bottom input[type="radio"]').forEach(radio => {
+                // Enable the radio button and remove any lingering event handlers
+                radio.disabled = false;
+                
+                // Clone and replace the radio to ensure clean event handling
+                const parent = radio.parentNode;
+                const clone = radio.cloneNode(true);
+                parent.replaceChild(clone, radio);
+            });
+            
+            // Re-initialize the submit redirects
+            updateSubmitRedirects();
+        }
+    });
+    
     // 2. Handle the pricing forms specifically
     document.querySelectorAll('#wf-form-Pricing-Top, #wf-form-Pricing-Bottom').forEach(form => {
         // Add submit event listener to the form
