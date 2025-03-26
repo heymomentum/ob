@@ -42,6 +42,10 @@ const validationRules = {
         max: 660,
         type: 'float',
         errorClass: 'error'
+    },
+    'consent-checkbox': {
+        type: 'checkbox',
+        errorClass: 'error'
     }
 };
 
@@ -49,6 +53,8 @@ class FormValidator {
     constructor() {
         this.fields = new Map();
         this.nextButtons = document.querySelectorAll('[data-form="next-btn"]');
+        this.isHeightStep = false;
+        this.consentCheckbox = null;
         this.initialize();
     }
 
@@ -62,6 +68,16 @@ class FormValidator {
                     rules: validationRules[fieldType]
                 });
                 this.setupEventListeners(input);
+                
+                // Check if we have height inputs - this indicates we're on the height step
+                if (fieldType.startsWith('height-')) {
+                    this.isHeightStep = true;
+                }
+                
+                // Store reference to consent checkbox
+                if (fieldType === 'consent-checkbox') {
+                    this.consentCheckbox = input;
+                }
             }
         });
 
@@ -71,21 +87,34 @@ class FormValidator {
 
     setupEventListeners(input) {
         // Handle input events
-        input.addEventListener('input', () => {
-            const fieldData = this.fields.get(input);
-            if (fieldData) {
+        const fieldData = this.fields.get(input);
+        
+        if (fieldData.rules.type === 'checkbox') {
+            input.addEventListener('change', () => {
+                fieldData.touched = true;
+                // Always remove error on change
+                input.classList.remove(fieldData.rules.errorClass);
+                this.validateAll();
+            });
+        } else {
+            input.addEventListener('input', () => {
                 fieldData.touched = true;
                 // Always remove error on input
                 input.classList.remove(fieldData.rules.errorClass);
                 this.validateAll();
-            }
-        });
+            });
+        }
     }
 
     validateField(input, fieldData) {
         // Don't show errors if field hasn't been touched
         if (!fieldData.touched) {
             return true;
+        }
+
+        // Handle checkbox validation
+        if (fieldData.rules.type === 'checkbox') {
+            return input.checked;
         }
 
         const value = fieldData.rules.type === 'int' ? 
@@ -115,6 +144,19 @@ class FormValidator {
                 isValid = false;
             }
         });
+
+        // Check if consent is required and valid for height step
+        if (this.isHeightStep && this.consentCheckbox) {
+            const consentFieldData = this.fields.get(this.consentCheckbox);
+            // If consent checkbox exists but is not checked, the form is invalid
+            if (!this.consentCheckbox.checked) {
+                isValid = false;
+                // Only show error if touched
+                if (consentFieldData && consentFieldData.touched && !this.consentCheckbox.checked) {
+                    this.consentCheckbox.classList.add(consentFieldData.rules.errorClass);
+                }
+            }
+        }
 
         // Update button state
         this.nextButtons.forEach(button => {
