@@ -1,6 +1,7 @@
 // Session storage keys
 const ENDPOINT_STORAGE_KEY = 'momentum-api-endpoint';
 const FORM_DATA_STORAGE_KEY = 'momentum-form-data-cache';
+const SELECTED_OFFER_KEY = 'selected-offer'; // New storage key for selected offer
 
 // Utility function to get cookie value
 function getCookie(name) {
@@ -35,6 +36,48 @@ try {
 } catch (e) {
     console.error('Error loading cached form data:', e);
     formDataCache = [];
+}
+
+// Function to synchronize form selections between both pricing forms
+function syncFormSelections(selectedValue) {
+    // Get all radio inputs from both forms
+    const allRadios = document.querySelectorAll('#wf-form-Pricing-Top input[type="radio"], #wf-form-Pricing-Bottom input[type="radio"]');
+    
+    // Uncheck all radios first
+    allRadios.forEach(radio => {
+        radio.checked = false;
+        
+        // Update the custom radio appearance
+        const customRadio = radio.closest('label')?.querySelector('.w-radio-input');
+        if (customRadio) {
+            customRadio.classList.remove('w--redirected-checked');
+        }
+    });
+    
+    // If we have a selection to apply, check the matching radios
+    if (selectedValue) {
+        // Find and check all radio buttons with this value
+        const matchingRadios = document.querySelectorAll(`#wf-form-Pricing-Top input[value="${selectedValue}"], #wf-form-Pricing-Bottom input[value="${selectedValue}"]`);
+        matchingRadios.forEach(radio => {
+            radio.checked = true;
+            
+            // Update the custom radio appearance
+            const customRadio = radio.closest('label')?.querySelector('.w-radio-input');
+            if (customRadio) {
+                customRadio.classList.add('w--redirected-checked');
+            }
+        });
+        
+        // Store the selection in sessionStorage
+        sessionStorage.setItem(SELECTED_OFFER_KEY, selectedValue);
+        console.log('Synchronized forms with offer:', selectedValue);
+    }
+}
+
+// Function to handle radio button changes
+function handleRadioChange(e) {
+    const selectedValue = e.target.value;
+    syncFormSelections(selectedValue);
 }
 
 // Function to update form submit button redirects based on domain
@@ -75,13 +118,28 @@ function updateSubmitRedirects() {
         });
     });
     
-    // Handle browser back button - reset radio buttons state
+    // Handle browser back button - restore form selection instead of resetting
     window.addEventListener('pageshow', function(event) {
         // Check if the page is being loaded from the browser cache (back button navigation)
         if (event.persisted) {
-            console.log('Page was loaded from cache (back button). Resetting form state...');
+            console.log('Page was loaded from cache (back button). Restoring form state...');
             
-            // Reset all radio buttons in pricing forms
+            // Get stored selection
+            const storedSelection = sessionStorage.getItem(SELECTED_OFFER_KEY);
+            
+            if (storedSelection) {
+                // Apply stored selection to both forms
+                console.log('Restoring selected offer:', storedSelection);
+                syncFormSelections(storedSelection);
+            } else {
+                // If no selection stored but forms have default checked items, sync those
+                const defaultChecked = document.querySelector('#wf-form-Pricing-Top input[type="radio"]:checked, #wf-form-Pricing-Bottom input[type="radio"]:checked');
+                if (defaultChecked) {
+                    syncFormSelections(defaultChecked.value);
+                }
+            }
+            
+            // Re-initialize the radio button event listeners
             document.querySelectorAll('#wf-form-Pricing-Top input[type="radio"], #wf-form-Pricing-Bottom input[type="radio"]').forEach(radio => {
                 // Enable the radio button and remove any lingering event handlers
                 radio.disabled = false;
@@ -90,6 +148,9 @@ function updateSubmitRedirects() {
                 const parent = radio.parentNode;
                 const clone = radio.cloneNode(true);
                 parent.replaceChild(clone, radio);
+                
+                // Add the change event listener to the cloned radio
+                clone.addEventListener('change', handleRadioChange);
             });
             
             // Re-initialize the submit redirects
@@ -99,6 +160,16 @@ function updateSubmitRedirects() {
     
     // 2. Handle the pricing forms specifically
     document.querySelectorAll('#wf-form-Pricing-Top, #wf-form-Pricing-Bottom').forEach(form => {
+        // Add event listeners to radio buttons in this form
+        form.querySelectorAll('input[type="radio"]').forEach(radio => {
+            // Remove any existing event listeners first
+            const newRadio = radio.cloneNode(true);
+            radio.parentNode.replaceChild(newRadio, radio);
+            
+            // Add change event listener
+            newRadio.addEventListener('change', handleRadioChange);
+        });
+        
         // Add submit event listener to the form
         form.addEventListener('submit', async function(e) {
             // Prevent the default form submission
@@ -109,6 +180,11 @@ function updateSubmitRedirects() {
             
             // Get the selected offer from the form
             const selectedOffer = form.querySelector('input[name="offer"]:checked')?.value || '';
+            
+            // Store the selection in session storage before redirecting
+            if (selectedOffer) {
+                sessionStorage.setItem(SELECTED_OFFER_KEY, selectedOffer);
+            }
             
             // Create the full query string with the offerId
             const queryString = baseQueryString + (selectedOffer ? `&offerId=${selectedOffer}` : '');
@@ -205,6 +281,11 @@ function updateSubmitRedirects() {
                 // Get the selected offer from the form
                 const selectedOffer = form.querySelector('input[name="offer"]:checked')?.value || '';
                 
+                // Store the selection in session storage before redirecting
+                if (selectedOffer) {
+                    sessionStorage.setItem(SELECTED_OFFER_KEY, selectedOffer);
+                }
+                
                 // Create the full query string with the offerId
                 const queryString = baseQueryString + (selectedOffer ? `&offerId=${selectedOffer}` : '');
                 const fullUrl = baseUrl + queryString;
@@ -274,6 +355,11 @@ function updateSubmitRedirects() {
             
             // Get the selected offer from the form
             const selectedOffer = form.querySelector('input[name="offer"]:checked')?.value || '';
+            
+            // Store the selection in session storage before redirecting
+            if (selectedOffer) {
+                sessionStorage.setItem(SELECTED_OFFER_KEY, selectedOffer);
+            }
             
             // Create the full query string with the offerId
             const queryString = baseQueryString + (selectedOffer ? `&offerId=${selectedOffer}` : '');
@@ -620,6 +706,20 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     // Set up event listeners for health metric inputs
     setupHealthMetricEventListeners();
+    
+    // Check for stored selection on initial page load
+    const storedSelection = sessionStorage.getItem(SELECTED_OFFER_KEY);
+    if (storedSelection) {
+        // Apply stored selection to both forms
+        console.log('Applying stored selection on page load:', storedSelection);
+        syncFormSelections(storedSelection);
+    } else {
+        // If no selection stored but forms have default checked items, sync those
+        const defaultChecked = document.querySelector('#wf-form-Pricing-Top input[type="radio"]:checked, #wf-form-Pricing-Bottom input[type="radio"]:checked');
+        if (defaultChecked) {
+            syncFormSelections(defaultChecked.value);
+        }
+    }
     
     // Now that the endpoint is guaranteed to be set up, do the initial form submission
     const initialFormData = trackFormValues();
