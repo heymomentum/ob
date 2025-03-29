@@ -655,10 +655,54 @@ function updateGoalWeightFromCookie() {
   }
 }
 
+// New function for consent checkbox
+function setupConsentCheckboxListener() {
+  const consentCheckbox = document.querySelector('[custom-data="consent-checkbox"]');
+  if (!consentCheckbox) {
+    console.log('Consent checkbox not found in the DOM');
+    return;
+  }
+
+  // Add event listener on 'change'
+  consentCheckbox.addEventListener('change', () => {
+    if (consentCheckbox.checked) {
+      // Capture timestamp
+      const timestamp = new Date().toISOString();
+      setCookie('consent-checkbox-timestamp', timestamp);
+
+      // Retrieve label text using the span with for attribute
+      const labelSpan = document.querySelector(`span.w-form-label[for="${consentCheckbox.id}"]`);
+      const labelText = labelSpan ? labelSpan.textContent.trim() : 'Unknown Label';
+
+      setCookie('consent-checkbox-label', labelText);
+      console.log('Consent checkbox checked. Timestamp and label saved.');
+    } else {
+      // Clear cookies on uncheck
+      document.cookie = 'consent-checkbox-timestamp=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      document.cookie = 'consent-checkbox-label=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      console.log('Consent checkbox unchecked; cookies cleared.');
+    }
+  });
+  
+  // Check if the checkbox is already checked on page load
+  // This handles the case where the page refreshes but the checkbox remains checked
+  if (consentCheckbox.checked) {
+    const timestamp = new Date().toISOString();
+    setCookie('consent-checkbox-timestamp', timestamp);
+    
+    const labelSpan = document.querySelector(`span.w-form-label[for="${consentCheckbox.id}"]`);
+    const labelText = labelSpan ? labelSpan.textContent.trim() : 'Unknown Label';
+    
+    setCookie('consent-checkbox-label', labelText);
+    console.log('Consent checkbox found already checked on page load. Timestamp and label saved.');
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   console.log('DOM fully loaded and parsed');
   setupEventListeners();
   setupCheckboxGroupListeners();
+  setupConsentCheckboxListener();
   updateBMI();
   updateFitnessLevel();
   updateMetabolismDisplay();
