@@ -165,6 +165,12 @@
     identifyUserInCustomerIO();
     // console.log("Customer.io: Initial identify call on page load.");
 
+    // Track Checkout Started event specifically on /results page load
+    if (window.location.pathname.includes('/results')) {
+        trackEventInCustomerIO('Product Added');
+        // console.log("Customer.io: Tracked 'Checkout Started' on /results page load.");
+    }
+
     // Add specific listeners based on page type or element presence
 
     // --- Listener for Quiz Step Completion ---
