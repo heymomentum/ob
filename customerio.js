@@ -134,19 +134,16 @@
 
 // --- Core Customer.io Functions ---
 
-  // Identify user or update traits in Customer.io
-  function identifyUserInCustomerIO() {
-    const traits = getCleanedCustomerIoData();
-    const email = traits.email || getCookie("email-input"); // Prioritize cleaned data, fallback to direct cookie
-
-    if (email) {
-      // If email exists, identify the user with it and all traits
-      window.analytics.identify(email, traits);
-      // console.log("Customer.io: Identified user", email, "with traits:", JSON.stringify(traits, null, 2));
-    } else {
-      // If no email, update traits for the anonymous user
-      window.analytics.identify(traits);
-      // console.log("Customer.io: Updated anonymous user traits:", JSON.stringify(traits, null, 2));
+  // Track email changes and handle identification
+  let lastKnownEmail = null;
+  function handleEmailChange() {
+    const currentEmail = getCookie("email-input");
+    
+    // Only identify if we have a new, valid email that's different from last known
+    if (currentEmail && currentEmail !== lastKnownEmail) {
+      lastKnownEmail = currentEmail;
+      // Send identify call with all traits
+      window.analytics.identify(currentEmail, getCleanedCustomerIoData());
     }
   }
 
@@ -161,9 +158,8 @@
 
   // Run on initial page load for both /quiz and /results
   document.addEventListener('DOMContentLoaded', () => {
-    // Initial identification attempt
-    identifyUserInCustomerIO();
-    // console.log("Customer.io: Initial identify call on page load.");
+    // Check email on page load
+    handleEmailChange();
 
     // Track Checkout Started event specifically on /results page load
     if (window.location.pathname.includes('/results')) {
@@ -174,6 +170,7 @@
     // Add specific listeners based on page type or element presence
 
     // --- Listener for Quiz Step Completion ---
+    // Handle next button clicks (for checkbox questions)
     document.body.addEventListener('click', function(event) {
         // Check if the click target (or its parent) is a next button
         const nextButton = event.target.closest('[data-form="next-btn"]');
@@ -181,7 +178,20 @@
             // Use requestAnimationFrame to defer execution until after quiz.js sync updates
             requestAnimationFrame(() => {
                 // console.log("Customer.io: Quiz step next button clicked.");
-                identifyUserInCustomerIO(); // Update traits/identity
+                handleEmailChange(); // Check if email changed
+                trackEventInCustomerIO('Quiz Step Completed'); // Track the step event
+            });
+        }
+    });
+
+    // Handle radio button selections (auto-advance questions)
+    document.body.addEventListener('change', function(event) {
+        // Check if the change event is from a radio input
+        if (event.target.matches('input[type="radio"]')) {
+            // Use requestAnimationFrame to defer execution until after quiz.js sync updates
+            requestAnimationFrame(() => {
+                // console.log("Customer.io: Quiz step radio selection completed.");
+                handleEmailChange(); // Check if email changed
                 trackEventInCustomerIO('Quiz Step Completed'); // Track the step event
             });
         }
@@ -202,14 +212,14 @@
                 element.addEventListener('submit', function(event) {
                     // Don't prevent default here, let moveo-dev handle submission
                     // console.log("Customer.io: Results form submitted.", element.id);
-                    identifyUserInCustomerIO(); // Send final traits
+                    handleEmailChange(); // Check if email changed
                     trackEventInCustomerIO('Quiz Results Submitted'); // Track final event
                 });
             } else if (element.tagName === 'A' || element.tagName === 'BUTTON' || element.tagName === 'INPUT') {
                  element.addEventListener('click', function(event) {
                     // Don't prevent default here, let moveo-dev handle redirection
                     // console.log("Customer.io: Results submit button clicked.");
-                    identifyUserInCustomerIO(); // Send final traits
+                    handleEmailChange(); // Check if email changed
                     trackEventInCustomerIO('Quiz Results Submitted'); // Track final event
                  });
             }
