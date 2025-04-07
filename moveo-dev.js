@@ -198,19 +198,25 @@ function updateSubmitRedirects() {
             // Show the loader immediately
             showFormLoader(form);
             
-            // Get the selected offer from the form
-            const selectedOffer = form.querySelector('input[name="offer"]:checked')?.value || '';
+            // ENHANCEMENT: Get the selected offer from the form with EXTRA validation
+            const selectedOffer = form.querySelector('input[name="offer"]:checked')?.value;
             
-            // Store the selection in session storage before redirecting
-            if (selectedOffer) {
-                sessionStorage.setItem(SELECTED_OFFER_KEY, selectedOffer);
+            // ENHANCEMENT: Validate we have the required data before proceeding
+            if (!selectedOffer) {
+                console.error('No offer selected! Cannot proceed with form submission.');
+                alert('Please select a package option before continuing.');
+                hideFormLoader(form);
+                return false;
             }
             
-            // Create the full query string with the offerId
-            const queryString = baseQueryString + (selectedOffer ? `&offerId=${selectedOffer}` : '');
+            // Store the selection in session storage before redirecting
+            sessionStorage.setItem(SELECTED_OFFER_KEY, selectedOffer);
+            
+            // Create the full query string with the offerId - now guaranteed to exist
+            const queryString = baseQueryString + `&offerId=${selectedOffer}`;
             const fullUrl = baseUrl + queryString;
             
-            console.log('Form submitted:', form.id);
+            console.log('Form submitted with validated offer:', form.id, selectedOffer);
             
             // Collect form data from ONLY this form
             const formFields = {};
@@ -222,11 +228,11 @@ function updateSubmitRedirects() {
                 console.log(`Radio ${radio.id}: value=${radio.value}, checked=${radio.checked}`);
             });
             
-            // Specifically handle radio button selection
-            const selectedRadio = form.querySelector('input[type="radio"]:checked');
+            // Specifically handle radio button selection - guaranteed to exist now
+            // Find the selected radio to get its name
+            const selectedRadio = form.querySelector('input[name="offer"]:checked');
             if (selectedRadio) {
-                console.log('Selected radio button:', selectedRadio.id, selectedRadio.value);
-                formFields[selectedRadio.name] = selectedRadio.value;
+                formFields[selectedRadio.name] = selectedOffer;
             }
             
             // Add other form elements
@@ -241,6 +247,7 @@ function updateSubmitRedirects() {
             
             // Add form identifier
             formFields.formId = form.id;
+            formFields.offer = selectedOffer; // ENHANCEMENT: Always include the offer explicitly
             
             // Get tracked form data - with universal metrics only
             const trackedData = trackFormValues();
@@ -259,7 +266,7 @@ function updateSubmitRedirects() {
                 }
             };
             
-            console.log('Final merged data with universal metrics:', allData);
+            console.log('Final merged data with universal metrics and validated offer:', allData);
             
             try {
                 // Send data to API and wait for the complete response
@@ -298,28 +305,31 @@ function updateSubmitRedirects() {
                 // Show the loader immediately
                 showFormLoader(form);
                 
-                // Get the selected offer from the form
-                const selectedOffer = form.querySelector('input[name="offer"]:checked')?.value || '';
+                // ENHANCEMENT: Get the selected offer with EXTRA validation
+                const selectedOffer = form.querySelector('input[name="offer"]:checked')?.value;
                 
-                // Store the selection in session storage before redirecting
-                if (selectedOffer) {
-                    sessionStorage.setItem(SELECTED_OFFER_KEY, selectedOffer);
+                // ENHANCEMENT: Validate we have the required data before proceeding
+                if (!selectedOffer) {
+                    console.error('No offer selected! Cannot proceed with submit button click.');
+                    alert('Please select a package option before continuing.');
+                    hideFormLoader(form);
+                    return false;
                 }
                 
-                // Create the full query string with the offerId
-                const queryString = baseQueryString + (selectedOffer ? `&offerId=${selectedOffer}` : '');
+                // Store the selection in session storage before redirecting
+                sessionStorage.setItem(SELECTED_OFFER_KEY, selectedOffer);
+                
+                // Create the full query string with the offerId - now guaranteed to exist
+                const queryString = baseQueryString + `&offerId=${selectedOffer}`;
                 const fullUrl = baseUrl + queryString;
                 
-                console.log('Submit button clicked, redirecting to:', fullUrl);
+                console.log('Submit button clicked with validated offer:', selectedOffer);
                 
                 // Collect form data
                 const formFields = {
-                    formId: form.id
+                    formId: form.id,
+                    offer: selectedOffer // ENHANCEMENT: Always include the offer explicitly
                 };
-                
-                if (selectedOffer) {
-                    formFields.offer = selectedOffer;
-                }
                 
                 // Get tracked data with universal metrics only
                 const trackedData = trackFormValues();
@@ -373,28 +383,31 @@ function updateSubmitRedirects() {
             // Show the loader immediately
             showFormLoader(form);
             
-            // Get the selected offer from the form
-            const selectedOffer = form.querySelector('input[name="offer"]:checked')?.value || '';
+            // ENHANCEMENT: Get the selected offer with EXTRA validation
+            const selectedOffer = form.querySelector('input[name="offer"]:checked')?.value;
             
-            // Store the selection in session storage before redirecting
-            if (selectedOffer) {
-                sessionStorage.setItem(SELECTED_OFFER_KEY, selectedOffer);
+            // ENHANCEMENT: Validate we have the required data before proceeding
+            if (!selectedOffer) {
+                console.error('No offer selected! Cannot proceed with pricing button click.');
+                alert('Please select a package option before continuing.');
+                hideFormLoader(form);
+                return false;
             }
             
-            // Create the full query string with the offerId
-            const queryString = baseQueryString + (selectedOffer ? `&offerId=${selectedOffer}` : '');
+            // Store the selection in session storage before redirecting
+            sessionStorage.setItem(SELECTED_OFFER_KEY, selectedOffer);
+            
+            // Create the full query string with the offerId - now guaranteed to exist
+            const queryString = baseQueryString + `&offerId=${selectedOffer}`;
             const fullUrl = baseUrl + queryString;
             
-            console.log('Pricing button clicked:', fullUrl);
+            console.log('Pricing button clicked with validated offer:', selectedOffer);
             
             // Collect form data
             const formFields = {
-                formId: form.id
+                formId: form.id,
+                offer: selectedOffer // ENHANCEMENT: Always include the offer explicitly
             };
-            
-            if (selectedOffer) {
-                formFields.offer = selectedOffer;
-            }
             
             // Get tracked data with universal metrics only
             const trackedData = trackFormValues();
