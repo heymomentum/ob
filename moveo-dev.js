@@ -15,6 +15,74 @@ function getCookie(name) {
   return null;
 }
 
+// NEW FUNCTION: Add function to extract email from Analytics.js data
+function getEmailFromAnalytics() {
+    let email = null;
+    
+    // Try to extract from Segment/Analytics.js if available
+    try {
+        // Check if analytics object exists (Segment)
+        if (window.analytics && window.analytics.user) {
+            const userData = window.analytics.user();
+            // Try to get email from user data
+            if (userData && userData.id) {
+                email = userData.id();
+            }
+            
+            // If that didn't work, try traits
+            if (!email && userData && userData.traits) {
+                const traits = userData.traits();
+                if (traits && traits.email) {
+                    email = traits.email;
+                }
+            }
+        }
+        
+        // Check for _analytics which some implementations use
+        if (!email && window._analytics && window._analytics.user) {
+            const userData = window._analytics.user();
+            if (userData && userData.id) {
+                email = userData.id();
+            }
+            
+            // Check traits here too
+            if (!email && userData && userData.traits) {
+                const traits = userData.traits();
+                if (traits && traits.email) {
+                    email = traits.email;
+                }
+            }
+        }
+        
+        // As a last resort, look for other common analytics variables
+        if (!email) {
+            // Check for ajs_user_id which often contains email in Segment
+            if (window.ajs_user_id) {
+                email = window.ajs_user_id;
+            }
+            
+            // Check for dataLayer (Google Tag Manager)
+            if (!email && window.dataLayer) {
+                for (let i = 0; i < window.dataLayer.length; i++) {
+                    const item = window.dataLayer[i];
+                    if (item && (item.email || item.userEmail || item.user_email)) {
+                        email = item.email || item.userEmail || item.user_email;
+                        break;
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error extracting email from analytics:', error);
+    }
+    
+    if (email) {
+        console.log('Found email from analytics data:', email);
+    }
+    
+    return email;
+}
+
 // Conversion utility functions for metric/imperial units
 function lbsToKg(lbs) {
   if (!lbs || isNaN(lbs)) return null;
@@ -102,8 +170,45 @@ function handleRadioChange(e) {
 
 // Function to update form submit button redirects based on domain
 function updateSubmitRedirects() {
-    const name = document.getElementById('name-input')?.value || getCookie('name-input');
-    const email = document.getElementById('email-input')?.value || getCookie('email-input');
+    // Get user data from multiple sources to ensure cross-browser compatibility
+    let name = document.getElementById('name-input')?.value;
+    let email = document.getElementById('email-input')?.value;
+    
+    // Try cookies as fallback
+    if (!name) name = getCookie('name-input');
+    if (!email) email = getCookie('email-input');
+    
+    // Try other cookie variations that might be used
+    if (!email) {
+        email = getCookie('email') || getCookie('ajs_user_id');
+    }
+    
+    // ENHANCEMENT: Try to get email from analytics
+    if (!email) {
+        email = getEmailFromAnalytics();
+    }
+    
+    // As a last resort, check tracked form data for email
+    if (!email) {
+        try {
+            // Get all cookies to search for any email-like values
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.includes('@')) {
+                    // Extract the value portion which might contain an email
+                    const emailMatch = cookie.match(/=(.+)$/);
+                    if (emailMatch && emailMatch[1] && emailMatch[1].includes('@')) {
+                        email = decodeURIComponent(emailMatch[1]);
+                        console.log("Found email in cookie:", email);
+                        break;
+                    }
+                }
+            }
+        } catch (e) {
+            console.error("Error parsing cookies for email:", e);
+        }
+    }
     
     const currentDomain = window.location.hostname;
     const baseUrl = (currentDomain === 'try-momentum.com' || currentDomain === 'www.try-momentum.com')
@@ -111,8 +216,8 @@ function updateSubmitRedirects() {
         : 'https://dev.d2bzdkijpstiae.amplifyapp.com/payment-screen';
         // Switch to: "https://www.app.try-momentum.com/payment-screen" for main site
     
-    console.log("Name from cookie or input:", name);
-    console.log("Email from cookie or input:", email);
+    console.log("Name from all sources:", name);
+    console.log("Email from all sources:", email);
     
     // Detect language from URL path
     const urlPath = window.location.pathname;
@@ -126,7 +231,7 @@ function updateSubmitRedirects() {
     
     console.log("Detected language from URL path:", language);
     
-    // Base query string without offer
+    // Base query string without offer - with more robust email handling
     const baseQueryString = `?firstName=${encodeURIComponent(name || 'null')}&lastName=null&fullName=null&email=${encodeURIComponent(email || 'null')}&lang=${language}`;
     
     // 1. Handle submit buttons with the submit-button class
@@ -249,6 +354,43 @@ function updateSubmitRedirects() {
             formFields.formId = form.id;
             formFields.offer = selectedOffer; // ENHANCEMENT: Always include the offer explicitly
             
+            // ENHANCEMENT: Ensure email is explicitly included
+            // Get email from multiple sources similar to updateSubmitRedirects
+            let userEmail = document.getElementById('email-input')?.value;
+            if (!userEmail) userEmail = getCookie('email-input');
+            if (!userEmail) userEmail = getCookie('email') || getCookie('ajs_user_id');
+            
+            // ENHANCEMENT: Try to get email from analytics
+            if (!userEmail) {
+                userEmail = getEmailFromAnalytics();
+            }
+            
+            // As a last resort, search all cookies for email-like values - RESTORED
+            if (!userEmail) {
+                try {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.includes('@')) {
+                            const emailMatch = cookie.match(/=(.+)$/);
+                            if (emailMatch && emailMatch[1] && emailMatch[1].includes('@')) {
+                                userEmail = decodeURIComponent(emailMatch[1]);
+                                console.log("Found email in cookie for API submission:", userEmail);
+                                break;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error("Error parsing cookies for email in API submission:", e);
+                }
+            }
+            
+            // Always include email if found
+            if (userEmail) {
+                formFields.email = userEmail;
+                console.log("Explicitly adding email to form data:", userEmail);
+            }
+            
             // Get tracked form data - with universal metrics only
             const trackedData = trackFormValues();
             console.log('Form tracked data with universal metrics:', trackedData);
@@ -273,23 +415,38 @@ function updateSubmitRedirects() {
                 const apiResponse = await sendDataToApi(allData);
                 console.log('Pricing form data sent successfully with response:', apiResponse);
                 
+                // ENHANCEMENT: Ensure email is in the redirect URL
+                let redirectUrl = fullUrl;
+                if (userEmail && !redirectUrl.includes(encodeURIComponent(userEmail))) {
+                    // Replace any "email=null" with the actual email
+                    if (redirectUrl.includes('email=null')) {
+                        redirectUrl = redirectUrl.replace('email=null', `email=${encodeURIComponent(userEmail)}`);
+                    } else {
+                        // Add email parameter if it's missing entirely
+                        const separator = redirectUrl.includes('?') ? '&' : '?';
+                        redirectUrl += `${separator}email=${encodeURIComponent(userEmail)}`;
+                    }
+                    console.log('Enhanced redirect URL with email:', redirectUrl);
+                }
+                
                 // Update the form's redirect attributes with the full URL including query parameters
-                form.setAttribute('redirect', fullUrl);
-                form.setAttribute('data-redirect', fullUrl);
+                form.setAttribute('redirect', redirectUrl);
+                form.setAttribute('data-redirect', redirectUrl);
                 
                 // Only redirect after confirming data was sent successfully
-                console.log('Data confirmed sent. Redirecting to:', fullUrl);
-                window.location.href = fullUrl;
+                console.log('Data confirmed sent. Redirecting to:', redirectUrl);
+                window.location.href = redirectUrl;
             } catch (error) {
                 console.error('Error sending pricing form data:', error);
                 
-                // Hide loader if there was an error
+                // Still log the error but don't show to user
+                console.log('Continuing with redirect despite error');
+                
+                // Hide loader
                 hideFormLoader(form);
                 
-                // Show an error message to the user - can be customized
-                if (confirm('There was an error sending your data. Would you like to continue anyway?')) {
-                    window.location.href = fullUrl;
-                }
+                // Automatically redirect without showing error
+                window.location.href = redirectUrl;
             }
             
             return false; // Ensure the form doesn't submit normally
@@ -331,6 +488,42 @@ function updateSubmitRedirects() {
                     offer: selectedOffer // ENHANCEMENT: Always include the offer explicitly
                 };
                 
+                // ENHANCEMENT: Ensure email is explicitly included
+                let userEmail = document.getElementById('email-input')?.value;
+                if (!userEmail) userEmail = getCookie('email-input');
+                if (!userEmail) userEmail = getCookie('email') || getCookie('ajs_user_id');
+                
+                // ENHANCEMENT: Try to get email from analytics
+                if (!userEmail) {
+                    userEmail = getEmailFromAnalytics();
+                }
+                
+                // As a last resort, search all cookies for email-like values - RESTORED
+                if (!userEmail) {
+                    try {
+                        const cookies = document.cookie.split(';');
+                        for (let i = 0; i < cookies.length; i++) {
+                            const cookie = cookies[i].trim();
+                            if (cookie.includes('@')) {
+                                const emailMatch = cookie.match(/=(.+)$/);
+                                if (emailMatch && emailMatch[1] && emailMatch[1].includes('@')) {
+                                    userEmail = decodeURIComponent(emailMatch[1]);
+                                    console.log("Found email in cookie for submit button:", userEmail);
+                                    break;
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Error parsing cookies for email in submit button:", e);
+                    }
+                }
+                
+                // Always include email if found
+                if (userEmail) {
+                    formFields.email = userEmail;
+                    console.log("Explicitly adding email to submit button data:", userEmail);
+                }
+                
                 // Get tracked data with universal metrics only
                 const trackedData = trackFormValues();
                 const allData = {
@@ -350,19 +543,34 @@ function updateSubmitRedirects() {
                     const apiResponse = await sendDataToApi(allData);
                     console.log('Form data sent successfully on button click with response:', apiResponse);
                     
+                    // ENHANCEMENT: Ensure email is in the redirect URL
+                    let redirectUrl = fullUrl;
+                    if (userEmail && !redirectUrl.includes(encodeURIComponent(userEmail))) {
+                        // Replace any "email=null" with the actual email
+                        if (redirectUrl.includes('email=null')) {
+                            redirectUrl = redirectUrl.replace('email=null', `email=${encodeURIComponent(userEmail)}`);
+                        } else {
+                            // Add email parameter if it's missing entirely
+                            const separator = redirectUrl.includes('?') ? '&' : '?';
+                            redirectUrl += `${separator}email=${encodeURIComponent(userEmail)}`;
+                        }
+                        console.log('Enhanced submit button redirect URL with email:', redirectUrl);
+                    }
+                    
                     // Only redirect after confirming data was sent successfully
-                    console.log('Data confirmed sent. Redirecting to:', fullUrl);
-                    window.location.href = fullUrl;
+                    console.log('Data confirmed sent. Redirecting to:', redirectUrl);
+                    window.location.href = redirectUrl;
                 } catch (error) {
                     console.error('Error sending form data on button click:', error);
                     
-                    // Hide loader if there was an error
+                    // Still log the error but don't show to user
+                    console.log('Continuing with redirect despite error');
+                    
+                    // Hide loader
                     hideFormLoader(form);
                     
-                    // Show an error message to the user - can be customized
-                    if (confirm('There was an error sending your data. Would you like to continue anyway?')) {
-                        window.location.href = fullUrl;
-                    }
+                    // Automatically redirect without showing error
+                    window.location.href = redirectUrl;
                 }
                 
                 return false; // Ensure the form doesn't submit normally
@@ -409,6 +617,42 @@ function updateSubmitRedirects() {
                 offer: selectedOffer // ENHANCEMENT: Always include the offer explicitly
             };
             
+            // ENHANCEMENT: Ensure email is explicitly included
+            let userEmail = document.getElementById('email-input')?.value;
+            if (!userEmail) userEmail = getCookie('email-input');
+            if (!userEmail) userEmail = getCookie('email') || getCookie('ajs_user_id');
+            
+            // ENHANCEMENT: Try to get email from analytics
+            if (!userEmail) {
+                userEmail = getEmailFromAnalytics();
+            }
+            
+            // As a last resort, search all cookies for email-like values - RESTORED
+            if (!userEmail) {
+                try {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.includes('@')) {
+                            const emailMatch = cookie.match(/=(.+)$/);
+                            if (emailMatch && emailMatch[1] && emailMatch[1].includes('@')) {
+                                userEmail = decodeURIComponent(emailMatch[1]);
+                                console.log("Found email in cookie for pricing button:", userEmail);
+                                break;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error("Error parsing cookies for email in pricing button:", e);
+                }
+            }
+            
+            // Always include email if found
+            if (userEmail) {
+                formFields.email = userEmail;
+                console.log("Explicitly adding email to pricing button data:", userEmail);
+            }
+            
             // Get tracked data with universal metrics only
             const trackedData = trackFormValues();
             const allData = {
@@ -428,19 +672,34 @@ function updateSubmitRedirects() {
                 const apiResponse = await sendDataToApi(allData);
                 console.log('Pricing button data sent successfully with response:', apiResponse);
                 
+                // ENHANCEMENT: Ensure email is in the redirect URL
+                let redirectUrl = fullUrl;
+                if (userEmail && !redirectUrl.includes(encodeURIComponent(userEmail))) {
+                    // Replace any "email=null" with the actual email
+                    if (redirectUrl.includes('email=null')) {
+                        redirectUrl = redirectUrl.replace('email=null', `email=${encodeURIComponent(userEmail)}`);
+                    } else {
+                        // Add email parameter if it's missing entirely
+                        const separator = redirectUrl.includes('?') ? '&' : '?';
+                        redirectUrl += `${separator}email=${encodeURIComponent(userEmail)}`;
+                    }
+                    console.log('Enhanced pricing button redirect URL with email:', redirectUrl);
+                }
+                
                 // Only redirect after confirming data was sent successfully
-                console.log('Data confirmed sent. Redirecting to:', fullUrl);
-                window.location.href = fullUrl;
+                console.log('Data confirmed sent. Redirecting to:', redirectUrl);
+                window.location.href = redirectUrl;
             } catch (error) {
                 console.error('Error sending data from pricing button:', error);
                 
-                // Hide loader if there was an error
+                // Still log the error but don't show to user
+                console.log('Continuing with redirect despite error');
+                
+                // Hide loader
                 hideFormLoader(form);
                 
-                // Show an error message to the user - can be customized
-                if (confirm('There was an error sending your data. Would you like to continue anyway?')) {
-                    window.location.href = fullUrl;
-                }
+                // Automatically redirect without showing error
+                window.location.href = redirectUrl;
             }
             
             return false;
