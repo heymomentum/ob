@@ -40,10 +40,12 @@ try {
 
 // Function to synchronize form selections between both pricing forms
 function syncFormSelections(selectedValue) {
+    console.log('Syncing form selections for value:', selectedValue);
+    
     // Get all radio inputs from both forms
     const allRadios = document.querySelectorAll('#wf-form-Pricing-Top input[type="radio"], #wf-form-Pricing-Bottom input[type="radio"]');
     
-    // Uncheck all radios first
+    // Uncheck all radios first and remove styling
     allRadios.forEach(radio => {
         radio.checked = false;
         
@@ -58,7 +60,9 @@ function syncFormSelections(selectedValue) {
     if (selectedValue) {
         // Find and check all radio buttons with this value
         const matchingRadios = document.querySelectorAll(`#wf-form-Pricing-Top input[value="${selectedValue}"], #wf-form-Pricing-Bottom input[value="${selectedValue}"]`);
+        
         matchingRadios.forEach(radio => {
+            // Check the radio button
             radio.checked = true;
             
             // Update the custom radio appearance
@@ -77,7 +81,23 @@ function syncFormSelections(selectedValue) {
 // Function to handle radio button changes
 function handleRadioChange(e) {
     const selectedValue = e.target.value;
+    
+    // First, sync the form selections as before
     syncFormSelections(selectedValue);
+    
+    // Then, explicitly handle the visual styling for all matching radio buttons
+    const matchingRadios = document.querySelectorAll(`#wf-form-Pricing-Top input[value="${selectedValue}"], #wf-form-Pricing-Bottom input[value="${selectedValue}"]`);
+    
+    matchingRadios.forEach(radio => {
+        // Find the custom radio button div within the label
+        const customRadio = radio.closest('label')?.querySelector('.w-radio-input');
+        if (customRadio) {
+            // Add the checked class to the custom radio button
+            customRadio.classList.add('w--redirected-checked');
+        }
+    });
+    
+    console.log('Radio button change handled for value:', selectedValue);
 }
 
 // Function to update form submit button redirects based on domain
@@ -643,6 +663,92 @@ document.addEventListener('click', function(event) {
     }
 });
 
+// Function to ensure all radio buttons have the correct event listeners
+function setupRadioButtonListeners() {
+    // Get all radio inputs from both forms
+    const allRadios = document.querySelectorAll('#wf-form-Pricing-Top input[type="radio"], #wf-form-Pricing-Bottom input[type="radio"]');
+    
+    allRadios.forEach(radio => {
+        // Remove any existing event listeners first
+        const newRadio = radio.cloneNode(true);
+        radio.parentNode.replaceChild(newRadio, radio);
+        
+        // Add change event listener
+        newRadio.addEventListener('change', handleRadioChange);
+        
+        // If this radio is checked, ensure the visual styling is applied
+        if (newRadio.checked) {
+            const customRadio = newRadio.closest('label')?.querySelector('.w-radio-input');
+            if (customRadio) {
+                customRadio.classList.add('w--redirected-checked');
+            }
+        }
+    });
+    
+    console.log('Radio button listeners set up for all forms');
+}
+
+// Function to handle clicks on radio button labels
+function setupLabelClickHandlers() {
+    // Get all radio button labels from both forms
+    const allLabels = document.querySelectorAll('#wf-form-Pricing-Top label.w-radio, #wf-form-Pricing-Bottom label.w-radio');
+    
+    allLabels.forEach(label => {
+        // Find the radio input within this label
+        const radio = label.querySelector('input[type="radio"]');
+        if (radio) {
+            // Add click event listener to the label
+            label.addEventListener('click', function(e) {
+                // Prevent the default behavior
+                e.preventDefault();
+                
+                // Check the radio button
+                radio.checked = true;
+                
+                // Trigger the change event on the radio button
+                const event = new Event('change', { bubbles: true });
+                radio.dispatchEvent(event);
+                
+                console.log('Label click handled for radio:', radio.value);
+            });
+        }
+    });
+    
+    console.log('Label click handlers set up for all forms');
+}
+
+// Function to handle clicks on the custom radio button divs
+function setupCustomRadioClickHandlers() {
+    // Get all custom radio button divs from both forms
+    const allCustomRadios = document.querySelectorAll('#wf-form-Pricing-Top .w-radio-input, #wf-form-Pricing-Bottom .w-radio-input');
+    
+    allCustomRadios.forEach(customRadio => {
+        // Find the radio input within the parent label
+        const label = customRadio.closest('label');
+        const radio = label?.querySelector('input[type="radio"]');
+        
+        if (radio) {
+            // Add click event listener to the custom radio div
+            customRadio.addEventListener('click', function(e) {
+                // Prevent the default behavior
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // Check the radio button
+                radio.checked = true;
+                
+                // Trigger the change event on the radio button
+                const event = new Event('change', { bubbles: true });
+                radio.dispatchEvent(event);
+                
+                console.log('Custom radio click handled for radio:', radio.value);
+            });
+        }
+    });
+    
+    console.log('Custom radio click handlers set up for all forms');
+}
+
 // Add initial data submission on page load
 document.addEventListener('DOMContentLoaded', async function() {
     console.log('Form tracking and API reporting initialized');
@@ -706,6 +812,15 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     // Set up event listeners for health metric inputs
     setupHealthMetricEventListeners();
+    
+    // Set up radio button listeners for all forms
+    setupRadioButtonListeners();
+    
+    // Set up label click handlers
+    setupLabelClickHandlers();
+    
+    // Set up custom radio click handlers
+    setupCustomRadioClickHandlers();
     
     // Check for stored selection on initial page load
     const storedSelection = sessionStorage.getItem(SELECTED_OFFER_KEY);
