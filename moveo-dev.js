@@ -214,7 +214,6 @@ function updateSubmitRedirects() {
     const baseUrl = (currentDomain === 'try-momentum.com' || currentDomain === 'www.try-momentum.com')
         ? 'https://www.app.try-momentum.com/payment-screen'
         : 'https://dev.d2bzdkijpstiae.amplifyapp.com/payment-screen';
-        // Switch to: "https://www.app.try-momentum.com/payment-screen" for main site
     
     console.log("Name from all sources:", name);
     console.log("Email from all sources:", email);
@@ -718,6 +717,19 @@ function trackFormValues() {
     // First collect all cookies into a temporary object
     const tempData = {};
     
+    // Define fields that should be arrays
+    const arrayFields = [
+        'bad-habits-uni',
+        'muscle-group-uni',
+        'problem-areas-uni',
+        'workout-location-uni'
+    ];
+
+    // Define fields that should be strings (not arrays)
+    const stringFields = [
+        'water-intake-uni'
+    ];
+    
     // Get all cookies
     const cookies = document.cookie.split(';');
     
@@ -733,8 +745,18 @@ function trackFormValues() {
             name = name.replace('-input', '');
         }
         
-        // Handle array fields (comma-separated values)
-        if (value.includes(',')) {
+        // Handle array fields
+        if (arrayFields.includes(name)) {
+            // Split by both comma and ampersand, then clean up
+            const values = value.split(/[,&]/)
+                .map(v => v.trim())
+                .filter(v => v !== '');
+            tempData[name] = values;
+        } else if (stringFields.includes(name)) {
+            // Handle string fields - keep as is
+            tempData[name] = value;
+        } else if (value.includes(',')) {
+            // Handle other comma-separated values
             tempData[name] = value.split(',').map(v => v.trim());
         } else {
             // Handle numeric values
