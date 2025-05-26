@@ -9,7 +9,7 @@
     .match(/[A-Za-z0-9]+/)?.[0] || 'A';
 
   // Determine target URL
-  const targetUrl = tier === 'A' ? '/results' : `/results-${tier.toLowerCase()}`;
+  const targetUrl = tier === 'A' ? 'results' : `results-${tier.toLowerCase()}`;
 
   // Prefetch the target page
   const prefetchLink = document.createElement('link');
@@ -20,9 +20,9 @@
   // Check if target page exists
   fetch(targetUrl, { method: 'HEAD' })
     .catch(() => {
-      // If target doesn't exist, fallback to /results
+      // If target doesn't exist, fallback to results
       setTimeout(() => {
-        window.location.replace('/results');
+        window.location.replace('results');
       }, LOADER_DELAY_MS);
     })
     .then(() => {
@@ -34,4 +34,4 @@
 })();
 
 // Add noscript fallback
-document.write('<noscript><meta http-equiv="refresh" content="0;url=/results"></noscript>'); 
+document.write('<noscript><meta http-equiv="refresh" content="0;url=results"></noscript>'); 
