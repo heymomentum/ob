@@ -323,7 +323,7 @@ function initializeQuizDataReporter() {
                         
                         // Get email from cookies for redirect URL
                         const email = getCookie('email-input') || getCookie('email') || getCookie('ajs_user_id');
-                        const redirectUrl = email ? `https://dev.d2fs7239g9ozrr.amplifyapp.com/en/results?email=${encodeURIComponent(email)}` : 'https://dev.d2fs7239g9ozrr.amplifyapp.com/en/results';
+                        const redirectUrl = email ? `https://dev.d2fs7239g9ozrr.amplifyapp.com/es/results?email=${encodeURIComponent(email)}` : 'https://dev.d2fs7239g9ozrr.amplifyapp.com/es/results';
                         
                         // Redirect to next page
                         console.log('Redirecting to next page...', redirectUrl);
@@ -334,7 +334,7 @@ function initializeQuizDataReporter() {
                         
                         // Still redirect even if data sending fails
                         const email = getCookie('email-input') || getCookie('email') || getCookie('ajs_user_id');
-                        const fallbackUrl = email ? `https://dev.d2fs7239g9ozrr.amplifyapp.com/en/results?email=${encodeURIComponent(email)}` : 'https://dev.d2fs7239g9ozrr.amplifyapp.com/en/results';
+                        const fallbackUrl = email ? `https://dev.d2fs7239g9ozrr.amplifyapp.com/es/results?email=${encodeURIComponent(email)}` : 'https://dev.d2fs7239g9ozrr.amplifyapp.com/es/results';
                         
                         setTimeout(() => {
                             window.location.href = fallbackUrl;
