@@ -187,13 +187,22 @@ async function sendDataToApi(formData, retryCount = 0) {
     
     try {
         console.log(`Sending quiz data to API (attempt ${retryCount + 1}/${MAX_RETRIES + 1}):`, data);
+        console.log('API URL:', apiUrl);
+        
         const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': 'Bearer YOUR_STRAPI_TOKEN_HERE', // Replace with your actual token
             },
+            mode: 'cors',
+            credentials: 'omit',
             body: JSON.stringify(data)
         });
+        
+        console.log('Response status:', response.status);
+        console.log('Response headers:', response.headers);
         
         if (!response.ok) {
             throw new Error(`API returned status: ${response.status}`);
@@ -205,6 +214,35 @@ async function sendDataToApi(formData, retryCount = 0) {
         return result;
     } catch (error) {
         console.error(`API Error (attempt ${retryCount + 1}):`, error);
+        
+        // Try HTTP fallback if HTTPS fails and we're on first attempt
+        if (retryCount === 0 && apiUrl.startsWith('https://') && apiUrl.includes('0.0.0.0:1337')) {
+            const httpUrl = apiUrl.replace('https://', 'http://');
+            console.log(`Trying HTTP fallback: ${httpUrl}`);
+            sessionStorage.setItem(ENDPOINT_STORAGE_KEY, httpUrl);
+            return sendDataToApi(formData, retryCount + 1);
+        }
+        
+        // Try without authentication if we get 401/403 and we're on first attempt
+        if (retryCount === 0 && (error.message.includes('401') || error.message.includes('403'))) {
+            console.log('Trying without authentication...');
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                mode: 'cors',
+                credentials: 'omit',
+                body: JSON.stringify(data)
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                console.log('API Response (no auth):', result);
+                return result;
+            }
+        }
         
         // If we haven't exceeded max retries, try again
         if (retryCount < MAX_RETRIES) {
@@ -225,7 +263,7 @@ function initializeQuizDataReporter() {
     // Determine default API endpoint based on domain
     const currentDomain = window.location.hostname;
     const defaultEndpoint = (currentDomain === 'try-momentum.com' || currentDomain === 'www.try-momentum.com')
-        ? 'https://o37rcsefc3.execute-api.us-east-1.amazonaws.com/production/api/onboarding/qst'
+        ? 'https://4bropw3xnc.execute-api.eu-central-1.amazonaws.com/development'
         : 'https://4bropw3xnc.execute-api.eu-central-1.amazonaws.com/development/api/onboarding/qst';
     
     console.log(`Quiz form data will be reported to: ${defaultEndpoint}`);
@@ -285,21 +323,18 @@ function initializeQuizDataReporter() {
                         
                         // Get email from cookies for redirect URL
                         const email = getCookie('email-input') || getCookie('email') || getCookie('ajs_user_id');
-                        const redirectUrl = email ? `https://google.com?email=${encodeURIComponent(email)}` : 'https://google.com';
+                        const redirectUrl = email ? `https://dev.d2fs7239g9ozrr.amplifyapp.com/en/results?email=${encodeURIComponent(email)}` : 'https://dev.d2fs7239g9ozrr.amplifyapp.com/en/results';
                         
                         // Redirect to next page
                         console.log('Redirecting to next page...', redirectUrl);
-                        window.location.href = redirectUrl; // For testing
-                        
-                        // Uncomment for production:
-                        // window.location.href = email ? `results.html?email=${encodeURIComponent(email)}` : 'results.html';
+                        window.location.href = redirectUrl;
                         
                     } catch (error) {
                         console.error('Error in form submission:', error);
                         
                         // Still redirect even if data sending fails
                         const email = getCookie('email-input') || getCookie('email') || getCookie('ajs_user_id');
-                        const fallbackUrl = email ? `https://google.com?email=${encodeURIComponent(email)}` : 'https://google.com';
+                        const fallbackUrl = email ? `https://dev.d2fs7239g9ozrr.amplifyapp.com/en/results?email=${encodeURIComponent(email)}` : 'https://dev.d2fs7239g9ozrr.amplifyapp.com/en/results';
                         
                         setTimeout(() => {
                             window.location.href = fallbackUrl;
