@@ -1,7 +1,7 @@
 // Quiz Data Reporter - Handles data reporting for quiz forms
-// Version: 2.0.0
+// Version: 2.0.1
 
-console.log('🎯 Quiz Data Reporter v2.0.0 loaded (Pre-submit mode)');
+console.log('🎯 Quiz Data Reporter v2.0.1 loaded (Pre-submit mode)');
 
 // Session storage keys
 const ENDPOINT_STORAGE_KEY = 'momentum-api-endpoint';
@@ -13,17 +13,67 @@ function getUserGeoLocation() {
     if (sessionStorage.getItem('momentum-user-country')) return;
     (async () => {
         try {
-            // Use ipapi.co which supports HTTPS and doesn't require API key
-            const geoRes = await fetch('https://ipapi.co/json/');
-            const geoData = await geoRes.json();
-            if (geoData && geoData.country_code) {
-                sessionStorage.setItem('momentum-user-country', geoData.country_code);
-                console.log('🌍 User country detected:', geoData.country_code);
+            // Try multiple geolocation services for better Safari compatibility
+            const geoServices = [
+                'https://ipapi.co/json/',
+                'https://ipinfo.io/json',
+                'https://api.ipify.org?format=json'
+            ];
+            
+            let geoData = null;
+            let success = false;
+            
+            for (const service of geoServices) {
+                try {
+                    console.log(`Trying geolocation service: ${service}`);
+                    const geoRes = await fetch(service, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                        },
+                        // Safari-friendly configuration
+                        mode: 'cors',
+                        credentials: 'omit'
+                    });
+                    
+                    if (geoRes.ok) {
+                        geoData = await geoRes.json();
+                        success = true;
+                        console.log(`Geolocation service ${service} succeeded`);
+                        break;
+                    }
+                } catch (serviceError) {
+                    console.warn(`Geolocation service ${service} failed:`, serviceError);
+                    continue;
+                }
+            }
+            
+            if (success && geoData) {
+                // Handle different response formats
+                let countryCode = null;
+                if (geoData.country_code) {
+                    countryCode = geoData.country_code;
+                } else if (geoData.country) {
+                    countryCode = geoData.country;
+                } else if (geoData.geoplugin_countryCode) {
+                    countryCode = geoData.geoplugin_countryCode;
+                }
+                
+                if (countryCode) {
+                    sessionStorage.setItem('momentum-user-country', countryCode);
+                    console.log('🌍 User country detected:', countryCode);
+                } else {
+                    console.warn('Could not determine user country from geoData:', geoData);
+                }
             } else {
-                console.warn('Could not determine user country from geoData:', geoData);
+                console.warn('All geolocation services failed, using fallback');
+                // Set a fallback country code or leave empty
+                sessionStorage.setItem('momentum-user-country', 'US');
             }
         } catch (error) {
             console.error('Error fetching user geolocation:', error);
+            // Set fallback on complete failure
+            sessionStorage.setItem('momentum-user-country', 'US');
         }
     })();
 }
@@ -221,16 +271,58 @@ async function sendDataToApi(formData, retryCount = 0) {
         console.log(`Sending quiz data to API (attempt ${retryCount + 1}/${MAX_RETRIES + 1}):`, data);
         console.log('API URL:', apiUrl);
         
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
+        // Try different fetch configurations for Safari compatibility
+        const fetchConfigs = [
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
             },
-            mode: 'cors',
-            credentials: 'omit',
-            body: JSON.stringify(data)
-        });
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                mode: 'cors',
+                credentials: 'omit',
+                body: JSON.stringify(data)
+            },
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                mode: 'no-cors',
+                body: JSON.stringify(data)
+            }
+        ];
+        
+        let response = null;
+        let lastError = null;
+        
+        for (let i = 0; i < fetchConfigs.length; i++) {
+            try {
+                console.log(`Trying fetch config ${i + 1}/${fetchConfigs.length}`);
+                response = await fetch(apiUrl, fetchConfigs[i]);
+                
+                // If we get a response, break out of the loop
+                if (response) {
+                    console.log(`Fetch config ${i + 1} succeeded with status: ${response.status}`);
+                    break;
+                }
+            } catch (configError) {
+                console.warn(`Fetch config ${i + 1} failed:`, configError);
+                lastError = configError;
+                continue;
+            }
+        }
+        
+        if (!response) {
+            throw lastError || new Error('All fetch configurations failed');
+        }
         
         console.log('Response status:', response.status);
         console.log('Response headers:', response.headers);
@@ -254,6 +346,45 @@ async function sendDataToApi(formData, retryCount = 0) {
             return sendDataToApi(formData, retryCount + 1);
         }
         
+        // Safari-specific fallback: Try using a different approach
+        if (retryCount === 0 && (error.message.includes('Load failed') || error.message.includes('CORS') || error.message.includes('Access-Control'))) {
+            console.log('Safari CORS issue detected, trying alternative approach...');
+            
+            // Try using XMLHttpRequest as a fallback for Safari
+            try {
+                const xhrResponse = await new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', apiUrl, true);
+                    xhr.setRequestHeader('Content-Type', 'application/json');
+                    xhr.setRequestHeader('Accept', 'application/json');
+                    
+                    xhr.onload = function() {
+                        if (xhr.status >= 200 && xhr.status < 300) {
+                            try {
+                                const result = JSON.parse(xhr.responseText);
+                                resolve(result);
+                            } catch (parseError) {
+                                reject(new Error('Failed to parse XHR response'));
+                            }
+                        } else {
+                            reject(new Error(`XHR failed with status: ${xhr.status}`));
+                        }
+                    };
+                    
+                    xhr.onerror = function() {
+                        reject(new Error('XHR request failed'));
+                    };
+                    
+                    xhr.send(JSON.stringify(data));
+                });
+                
+                console.log('XHR fallback succeeded:', xhrResponse);
+                return xhrResponse;
+            } catch (xhrError) {
+                console.warn('XHR fallback also failed:', xhrError);
+            }
+        }
+        
         // Try without authentication if we get 401/403 and we're on first attempt
         if (retryCount === 0 && (error.message.includes('401') || error.message.includes('403'))) {
             console.log('Trying without authentication...');
@@ -261,10 +392,7 @@ async function sendDataToApi(formData, retryCount = 0) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json',
                 },
-                mode: 'cors',
-                credentials: 'omit',
                 body: JSON.stringify(data)
             });
             
@@ -282,6 +410,24 @@ async function sendDataToApi(formData, retryCount = 0) {
             return sendDataToApi(formData, retryCount + 1);
         } else {
             console.error(`Failed after ${MAX_RETRIES + 1} attempts`);
+            
+            // Final fallback: Store data locally so it's not lost
+            try {
+                const failedData = {
+                    timestamp: new Date().toISOString(),
+                    data: formData,
+                    status: 'failed_to_send'
+                };
+                
+                const existingFailedData = JSON.parse(localStorage.getItem('momentum-failed-data') || '[]');
+                existingFailedData.push(failedData);
+                localStorage.setItem('momentum-failed-data', JSON.stringify(existingFailedData));
+                
+                console.log('Data stored locally as fallback due to API failure');
+            } catch (storageError) {
+                console.error('Failed to store data locally:', storageError);
+            }
+            
             throw error; // Re-throw after all retries exhausted
         }
     }
@@ -320,11 +466,7 @@ async function sendNameToApi(name, retryCount = 0) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'Authorization': 'Bearer YOUR_STRAPI_TOKEN_HERE', // Replace with your actual token
             },
-            mode: 'cors',
-            credentials: 'omit',
             body: JSON.stringify(data)
         });
         
@@ -356,10 +498,7 @@ async function sendNameToApi(name, retryCount = 0) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json',
                 },
-                mode: 'cors',
-                credentials: 'omit',
                 body: JSON.stringify(data)
             });
             
@@ -379,6 +518,41 @@ async function sendNameToApi(name, retryCount = 0) {
             console.error(`Name update failed after ${MAX_RETRIES + 1} attempts`);
             throw error; // Re-throw after all retries exhausted
         }
+    }
+}
+
+// Function to retry sending failed data
+async function retryFailedData() {
+    try {
+        const failedData = JSON.parse(localStorage.getItem('momentum-failed-data') || '[]');
+        if (failedData.length > 0) {
+            console.log(`Found ${failedData.length} failed data entries, attempting to retry...`);
+            
+            const successfulRetries = [];
+            
+            for (const failedEntry of failedData) {
+                try {
+                    await sendDataToApi(failedEntry.data);
+                    successfulRetries.push(failedEntry);
+                    console.log('Successfully retried failed data entry');
+                } catch (retryError) {
+                    console.warn('Failed to retry data entry:', retryError);
+                }
+            }
+            
+            // Remove successfully retried entries
+            const remainingFailedData = failedData.filter(entry => 
+                !successfulRetries.includes(entry)
+            );
+            
+            localStorage.setItem('momentum-failed-data', JSON.stringify(remainingFailedData));
+            
+            if (successfulRetries.length > 0) {
+                console.log(`Successfully retried ${successfulRetries.length} data entries`);
+            }
+        }
+    } catch (error) {
+        console.error('Error retrying failed data:', error);
     }
 }
 
@@ -584,12 +758,19 @@ function initializeQuizDataReporter() {
 }
 
 // Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', initializeQuizDataReporter);
+document.addEventListener('DOMContentLoaded', async function() {
+    // First retry any failed data
+    await retryFailedData();
+    
+    // Then initialize the quiz data reporter
+    initializeQuizDataReporter();
+});
 
 // Export functions for potential external use
 window.QuizDataReporter = {
     trackQuizFormValues,
     sendDataToApi,
+    retryFailedData,
     // sendNameToApi is kept for potential future use but not used in current flow
     initializeQuizDataReporter
 }; 
