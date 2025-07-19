@@ -563,7 +563,7 @@ function initializeQuizDataReporter() {
     // Determine default API endpoint based on domain
     const currentDomain = window.location.hostname;
     const defaultEndpoint = (currentDomain === 'try-momentum.com' || currentDomain === 'www.try-momentum.com')
-        ? 'https://4bropw3xnc.execute-api.eu-central-1.amazonaws.com/development'
+        ? 'https://o37rcsefc3.execute-api.us-east-1.amazonaws.com/production/api/onboarding/qst'
         : 'https://4bropw3xnc.execute-api.eu-central-1.amazonaws.com/development/api/onboarding/qst';
     
     console.log(`Quiz form data will be reported to: ${defaultEndpoint}`);
@@ -670,7 +670,10 @@ function initializeQuizDataReporter() {
                         const country = sessionStorage.getItem('momentum-user-country');
                         
                         // Build redirect URL with email and country
-                        let redirectUrl = 'https://dev.d2fs7239g9ozrr.amplifyapp.com/es/results';
+                        const baseUrl = (currentDomain === 'try-momentum.com' || currentDomain === 'www.try-momentum.com')
+                            ? 'https://ob-dev.try-momentum.com/en/results'
+                            : 'https://ob-dev.try-momentum.com/en/results';
+                        let redirectUrl = baseUrl;
                         const params = new URLSearchParams();
                         
                         if (email) {
@@ -698,7 +701,10 @@ function initializeQuizDataReporter() {
                         const country = sessionStorage.getItem('momentum-user-country');
                         
                         // Build fallback redirect URL with email and country
-                        let fallbackUrl = 'https://dev.d2fs7239g9ozrr.amplifyapp.com/es/results';
+                        const fallbackBaseUrl = (currentDomain === 'try-momentum.com' || currentDomain === 'www.try-momentum.com')
+                            ? 'https://ob.try-momentum.com/en/results'
+                            : 'https://ob-dev.try-momentum.com/en/results';
+                        let fallbackUrl = fallbackBaseUrl;
                         const params = new URLSearchParams();
                         
                         if (email) {
