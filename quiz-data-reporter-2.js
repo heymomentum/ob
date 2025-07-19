@@ -1,7 +1,7 @@
 // Quiz Data Reporter - Handles data reporting for quiz forms
-// Version: 3.0.1
+// Version: 3.0.4
 
-console.log('🎯 Quiz Data Reporter v3.0.1 loaded (Pre-submit mode)');
+console.log('🎯 Quiz Data Reporter v3.0.4 loaded (Pre-submit mode)');
 
 // Session storage keys
 const ENDPOINT_STORAGE_KEY = 'momentum-api-endpoint';
@@ -13,6 +13,8 @@ const FORM_DATA_STORAGE_KEY = 'momentum-form-data-cache';
 const SEND_TIMEOUT_MS = 5000; // max wait for primary fetch
 let momentumDataSent = false; // becomes true once payload delivered
 let momentumPendingData = null; // holds payload until confirmed sent
+let preSubmitDataSent = false; // prevents multiple pre-submit calls
+let nameDataSent = false; // prevents multiple name submissions
 
 // Function to fetch user's country based on IP and store in sessionStorage
 function getUserGeoLocation() {
@@ -501,7 +503,7 @@ async function sendDataToApi(formData, retryCount = 0) {
   }
 }
 
-// Function to send only the name to update the existing record
+// Function to send the name merged with existing form data
 async function sendNameToApi(name, retryCount = 0) {
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 1000;
@@ -520,11 +522,33 @@ async function sendNameToApi(name, retryCount = 0) {
     throw new Error('No email found for name update');
   }
 
+  // Get the existing form data from session storage
+  const existingFormData = sessionStorage.getItem(FORM_DATA_STORAGE_KEY);
+  let mergedData = {};
+  
+  if (existingFormData) {
+    try {
+      mergedData = JSON.parse(existingFormData);
+      console.log('Merging name with existing form data:', mergedData);
+    } catch (parseError) {
+      console.warn('Failed to parse existing form data, using fresh data');
+      mergedData = trackQuizFormValues(true); // excludeName = true
+    }
+  } else {
+    console.log('No existing form data found, collecting fresh data');
+    mergedData = trackQuizFormValues(true); // excludeName = true
+  }
+
+  // Add the name to the merged data
+  mergedData.name = name;
+  
+  // Ensure email is included
+  if (!mergedData.email) {
+    mergedData.email = email;
+  }
+
   const data = {
-    data: {
-      name: name,
-      email: email,
-    },
+    data: mergedData,
   };
 
   try {
@@ -540,10 +564,7 @@ async function sendNameToApi(name, retryCount = 0) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Accept: 'application/json',
       },
-      mode: 'cors',
-      credentials: 'omit',
       body: JSON.stringify(data),
     });
 
@@ -582,10 +603,7 @@ async function sendNameToApi(name, retryCount = 0) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Accept: 'application/json',
         },
-        mode: 'cors',
-        credentials: 'omit',
         body: JSON.stringify(data),
       });
 
@@ -698,15 +716,27 @@ function initializeQuizDataReporter() {
 
   // Function to send pre-submit data
   function sendPreSubmitData() {
+    // Prevent multiple submissions
+    if (preSubmitDataSent) {
+      console.log('Pre-submit data already sent, skipping duplicate');
+      return;
+    }
+    
     try {
       // Collect all form data except name
       const formData = trackQuizFormValues(true); // excludeName = true
       console.log('Pre-submit form data cached (excluding name):', formData);
       // Cache the payload so we can merge name later
       sessionStorage.setItem(FORM_DATA_STORAGE_KEY, JSON.stringify(formData));
+      
+      // Mark as sent before making the API call
+      preSubmitDataSent = true;
+      
       sendDataToApi(formData);
     } catch (e) {
       console.warn('Unable to cache pre-submit data:', e);
+      // Reset flag on error so user can try again
+      preSubmitDataSent = false;
     }
   }
 
@@ -754,56 +784,16 @@ function initializeQuizDataReporter() {
             );
             const name = nameInput ? nameInput.value : '';
 
-            if (name) {
-              console.log('Sending name via sendBeacon:', name);
-              const apiUrl = sessionStorage.getItem(ENDPOINT_STORAGE_KEY);
-              if (apiUrl) {
-                console.log('API URL for name submission:', apiUrl);
-                const email =
-                  getCookie('email-input') ||
-                  getCookie('email') ||
-                  getCookie('ajs_user_id');
-                console.log('Email for name submission:', email);
-                const nameData = {
-                  data: {
-                    name: name,
-                    email: email,
-                  }
-                };
-
-                console.log('Name data to be sent:', nameData);
-
-                try {
-                  // Use text/plain MIME type so the request remains a "simple"
-                  // CORS request (avoids the pre-flight that was failing due
-                  // to credential mode = include).
-                  const blob = new Blob([JSON.stringify(nameData)], {
-                    type: 'text/plain',
-                  });
-                  const success = navigator.sendBeacon(apiUrl, blob);
-                  console.log('Name sendBeacon result:', success);
-                } catch (beaconError) {
-                  console.warn(
-                    'sendBeacon failed, falling back to fetch without waiting:',
-                    beaconError
-                  );
-                  // Fallback to fetch without waiting - use CORS-safe config
-                  fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    mode: 'cors',
-                    credentials: 'omit',
-                    body: JSON.stringify(nameData),
-                  }).catch((error) => {
-                    console.error(
-                      'Error sending name via fetch fallback:',
-                      error
-                    );
-                  });
-                }
-              }
+            if (name && !nameDataSent) {
+              console.log('Sending name via sendNameToApi with proper CORS handling');
+              // Mark as sent to prevent duplicates
+              nameDataSent = true;
+              // Use sendNameToApi but don't wait for it to complete
+              sendNameToApi(name).catch((error) => {
+                console.warn('Name submission failed, but continuing with redirect:', error);
+              });
+            } else if (nameDataSent) {
+              console.log('Name data already sent, skipping duplicate');
             }
 
             // Get email from cookies for redirect URL
@@ -895,20 +885,32 @@ function initializeQuizDataReporter() {
   setupPreSubmitHandler();
   setupFinalSubmitHandler();
 
-  // Also try again after delays in case elements load later
+  // Also try again after delays in case elements load later (but only if not already set up)
   setTimeout(() => {
-    setupPreSubmitHandler();
-    setupFinalSubmitHandler();
+    if (!preSubmitDataSent) {
+      setupPreSubmitHandler();
+    }
+    if (!nameDataSent) {
+      setupFinalSubmitHandler();
+    }
   }, 1000);
 
   setTimeout(() => {
-    setupPreSubmitHandler();
-    setupFinalSubmitHandler();
+    if (!preSubmitDataSent) {
+      setupPreSubmitHandler();
+    }
+    if (!nameDataSent) {
+      setupFinalSubmitHandler();
+    }
   }, 2000);
 
   setTimeout(() => {
-    setupPreSubmitHandler();
-    setupFinalSubmitHandler();
+    if (!preSubmitDataSent) {
+      setupPreSubmitHandler();
+    }
+    if (!nameDataSent) {
+      setupFinalSubmitHandler();
+    }
   }, 3000);
 }
 
