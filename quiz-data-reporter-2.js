@@ -1,7 +1,7 @@
 // Quiz Data Reporter - Handles data reporting for quiz forms
-// Version: 3.0.6
+// Version: 3.0.7
 
-console.log('🎯 Quiz Data Reporter v3.0.6 loaded (Pre-submit mode)');
+console.log('🎯 Quiz Data Reporter v3.0.7 loaded (Pre-submit mode)');
 
 // Session storage keys
 const ENDPOINT_STORAGE_KEY = 'momentum-api-endpoint';
@@ -925,8 +925,11 @@ function initializeQuizDataReporter() {
               console.log('Name data already sent, skipping duplicate');
             }
 
-            // Get email for redirect URL (with Safari Incognito fallback)
-            const email = getEmail();
+            // Get email from current form input (always up-to-date)
+            const emailInput = document.querySelector('[custom-data="email-input"]') || 
+                               document.querySelector('input[type="email"]') ||
+                               document.querySelector('input[name="email"]');
+            const email = emailInput ? emailInput.value : null;
             const country = sessionStorage.getItem('momentum-user-country');
 
             // Build redirect URL with email and country
@@ -957,8 +960,11 @@ function initializeQuizDataReporter() {
           } catch (error) {
             console.error('Error in final form submission:', error);
 
-            // Still redirect even if name sending fails (with Safari Incognito fallback)
-            const email = getEmail();
+            // Still redirect even if name sending fails (get current email)
+            const emailInput = document.querySelector('[custom-data="email-input"]') || 
+                               document.querySelector('input[type="email"]') ||
+                               document.querySelector('input[name="email"]');
+            const email = emailInput ? emailInput.value : null;
             const country = sessionStorage.getItem('momentum-user-country');
 
             // Build fallback redirect URL with email and country
