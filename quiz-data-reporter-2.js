@@ -1,11 +1,12 @@
 // Quiz Data Reporter - Handles data reporting for quiz forms
-// Version: 3.0.4
+// Version: 3.0.6
 
-console.log('🎯 Quiz Data Reporter v3.0.4 loaded (Pre-submit mode)');
+console.log('🎯 Quiz Data Reporter v3.0.6 loaded (Pre-submit mode)');
 
 // Session storage keys
 const ENDPOINT_STORAGE_KEY = 'momentum-api-endpoint';
 const FORM_DATA_STORAGE_KEY = 'momentum-form-data-cache';
+const EMAIL_STORAGE_KEY = 'momentum-user-email';
 
 // ---------------------------------------------------------------------------
 // Added: reliable send configuration & state flags
@@ -106,6 +107,30 @@ function getCookie(name) {
     while (c.charAt(0) === ' ') c = c.substring(1, c.length);
     if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
   }
+  return null;
+}
+
+// Enhanced function to get email with fallback to sessionStorage
+function getEmail() {
+  // Try cookies first
+  const emailFromCookie = 
+    getCookie('email-input') || 
+    getCookie('email') || 
+    getCookie('ajs_user_id');
+  
+  if (emailFromCookie) {
+    // Store in sessionStorage for future use (Safari Incognito fallback)
+    sessionStorage.setItem(EMAIL_STORAGE_KEY, emailFromCookie);
+    return emailFromCookie;
+  }
+  
+  // Fallback to sessionStorage
+  const emailFromStorage = sessionStorage.getItem(EMAIL_STORAGE_KEY);
+  if (emailFromStorage) {
+    console.log('Using email from sessionStorage (Safari Incognito fallback)');
+    return emailFromStorage;
+  }
+  
   return null;
 }
 
@@ -509,8 +534,7 @@ async function sendNameToApi(name, retryCount = 0) {
   const RETRY_DELAY = 1000;
 
   const apiUrl = sessionStorage.getItem(ENDPOINT_STORAGE_KEY);
-  const email =
-    getCookie('email-input') || getCookie('email') || getCookie('ajs_user_id');
+  const email = getEmail();
 
   if (!apiUrl) {
     console.log('No API endpoint found');
@@ -518,7 +542,23 @@ async function sendNameToApi(name, retryCount = 0) {
   }
 
   if (!email) {
-    console.log('No email found for name update');
+    console.log('No email found for name update - checking if we can extract from existing form data');
+    
+    // Try to get email from existing form data as last resort
+    const existingFormData = sessionStorage.getItem(FORM_DATA_STORAGE_KEY);
+    if (existingFormData) {
+      try {
+        const parsedData = JSON.parse(existingFormData);
+        if (parsedData.email) {
+          console.log('Found email in existing form data:', parsedData.email);
+          sessionStorage.setItem(EMAIL_STORAGE_KEY, parsedData.email);
+          return sendNameToApi(name, retryCount); // Retry with found email
+        }
+      } catch (parseError) {
+        console.warn('Failed to parse existing form data for email extraction');
+      }
+    }
+    
     throw new Error('No email found for name update');
   }
 
@@ -560,13 +600,58 @@ async function sendNameToApi(name, retryCount = 0) {
     );
     console.log('API URL:', apiUrl);
 
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    // Try different fetch configurations for Safari compatibility (same as sendDataToApi)
+    const fetchConfigs = [
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
       },
-      body: JSON.stringify(data),
-    });
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        mode: 'cors',
+        credentials: 'omit',
+        body: JSON.stringify(data),
+      },
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'no-cors',
+        body: JSON.stringify(data),
+      },
+    ];
+
+    let response = null;
+    let lastError = null;
+
+    for (let i = 0; i < fetchConfigs.length; i++) {
+      try {
+        console.log(`Trying name update fetch config ${i + 1}/${fetchConfigs.length}`);
+        response = await fetch(apiUrl, fetchConfigs[i]);
+
+        // If we get a response, break out of the loop
+        if (response) {
+          console.log(`Name update fetch config ${i + 1} succeeded with status: ${response.status}`);
+          break;
+        }
+      } catch (configError) {
+        console.warn(`Name update fetch config ${i + 1} failed:`, configError);
+        lastError = configError;
+        continue;
+      }
+    }
+
+    if (!response) {
+      throw lastError || new Error('All name update fetch configurations failed');
+    }
 
     console.log('Response status:', response.status);
 
@@ -591,6 +676,50 @@ async function sendNameToApi(name, retryCount = 0) {
       console.log(`Trying HTTP fallback for name update: ${httpUrl}`);
       sessionStorage.setItem(ENDPOINT_STORAGE_KEY, httpUrl);
       return sendNameToApi(name, retryCount + 1);
+    }
+
+    // Safari-specific fallback: Try using XHR as a fallback for Safari
+    if (
+      retryCount === 0 &&
+      (error.message.includes('Load failed') ||
+        error.message.includes('CORS') ||
+        error.message.includes('Access-Control'))
+    ) {
+      console.log('Safari CORS issue detected for name update, trying XHR fallback...');
+
+      // Try using XMLHttpRequest as a fallback for Safari
+      try {
+        const xhrResponse = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', apiUrl, true);
+          xhr.setRequestHeader('Content-Type', 'application/json');
+          xhr.setRequestHeader('Accept', 'application/json');
+
+          xhr.onload = function () {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                const result = JSON.parse(xhr.responseText);
+                resolve(result);
+              } catch (parseError) {
+                reject(new Error('Failed to parse XHR response for name update'));
+              }
+            } else {
+              reject(new Error(`XHR name update failed with status: ${xhr.status}`));
+            }
+          };
+
+          xhr.onerror = function () {
+            reject(new Error('XHR name update request failed'));
+          };
+
+          xhr.send(JSON.stringify(data));
+        });
+
+        console.log('XHR name update fallback succeeded:', xhrResponse);
+        return xhrResponse;
+      } catch (xhrError) {
+        console.warn('XHR name update fallback also failed:', xhrError);
+      }
     }
 
     // Try without authentication if we get 401/403 and we're on first attempt
@@ -796,11 +925,8 @@ function initializeQuizDataReporter() {
               console.log('Name data already sent, skipping duplicate');
             }
 
-            // Get email from cookies for redirect URL
-            const email =
-              getCookie('email-input') ||
-              getCookie('email') ||
-              getCookie('ajs_user_id');
+            // Get email for redirect URL (with Safari Incognito fallback)
+            const email = getEmail();
             const country = sessionStorage.getItem('momentum-user-country');
 
             // Build redirect URL with email and country
@@ -831,11 +957,8 @@ function initializeQuizDataReporter() {
           } catch (error) {
             console.error('Error in final form submission:', error);
 
-            // Still redirect even if name sending fails
-            const email =
-              getCookie('email-input') ||
-              getCookie('email') ||
-              getCookie('ajs_user_id');
+            // Still redirect even if name sending fails (with Safari Incognito fallback)
+            const email = getEmail();
             const country = sessionStorage.getItem('momentum-user-country');
 
             // Build fallback redirect URL with email and country
