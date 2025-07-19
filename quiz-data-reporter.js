@@ -1,11 +1,18 @@
 // Quiz Data Reporter - Handles data reporting for quiz forms
-// Version: 2.0.2
+// Version: 2.0.3
 
-console.log('🎯 Quiz Data Reporter v2.0.2 loaded (Pre-submit mode)');
+console.log('🎯 Quiz Data Reporter v2.0.3 loaded (Pre-submit mode)');
 
 // Session storage keys
 const ENDPOINT_STORAGE_KEY = 'momentum-api-endpoint';
 const FORM_DATA_STORAGE_KEY = 'momentum-form-data-cache';
+
+// ---------------------------------------------------------------------------
+// Added: reliable send configuration & state flags
+// ---------------------------------------------------------------------------
+const SEND_TIMEOUT_MS = 5000;                 // max wait for primary fetch
+let momentumDataSent = false;                 // becomes true once payload delivered
+let momentumPendingData = null;               // holds payload until confirmed sent
 
 // Function to fetch user's country based on IP and store in sessionStorage
 function getUserGeoLocation() {
@@ -253,183 +260,82 @@ function trackQuizFormValues(excludeName = false) {
     return formData;
 }
 
-// Function to send data to API with retry logic
-async function sendDataToApi(formData, retryCount = 0) {
-    const MAX_RETRIES = 3;
-    const RETRY_DELAY = 1000;
-    
+// --------------------------------------------------------------------------------
+// Re-implemented sendDataToApi – single simple request, awaited, timeout protected
+// --------------------------------------------------------------------------------
+async function sendDataToApi(formData, timeoutMs = SEND_TIMEOUT_MS) {
     const apiUrl = sessionStorage.getItem(ENDPOINT_STORAGE_KEY);
-    
     if (!apiUrl) {
         console.log('No API endpoint found');
         throw new Error('No API endpoint found');
     }
-    
-    const data = { data: formData };
-    
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
     try {
-        console.log(`Sending quiz data to API (attempt ${retryCount + 1}/${MAX_RETRIES + 1}):`, data);
-        console.log('API URL:', apiUrl);
-        
-        // Try different fetch configurations for Safari compatibility
-        const fetchConfigs = [
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data)
-            },
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                },
-                mode: 'cors',
-                credentials: 'omit',
-                body: JSON.stringify(data)
-            },
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                mode: 'no-cors',
-                body: JSON.stringify(data)
-            }
-        ];
-        
-        let response = null;
-        let lastError = null;
-        
-        for (let i = 0; i < fetchConfigs.length; i++) {
-            try {
-                console.log(`Trying fetch config ${i + 1}/${fetchConfigs.length}`);
-                response = await fetch(apiUrl, fetchConfigs[i]);
-                
-                // If we get a response, break out of the loop
-                if (response) {
-                    console.log(`Fetch config ${i + 1} succeeded with status: ${response.status}`);
-                    break;
-                }
-            } catch (configError) {
-                console.warn(`Fetch config ${i + 1} failed:`, configError);
-                lastError = configError;
-                continue;
-            }
-        }
-        
-        if (!response) {
-            throw lastError || new Error('All fetch configurations failed');
-        }
-        
-        console.log('Response status:', response.status);
-        console.log('Response headers:', response.headers);
-        
+        console.log('Sending quiz data to API (awaited) …');
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }, // testing application/json
+            body: JSON.stringify({ data: formData }),
+            keepalive: true,
+            signal: controller.signal
+        });
+
+        clearTimeout(timer);
+
         if (!response.ok) {
             throw new Error(`API returned status: ${response.status}`);
         }
-        
-        const result = await response.json();
-        console.log('API Response:', result);
-        
-        return result;
+
+        momentumDataSent = true;
+        console.log('✅ Data sent successfully');
+
+        // Response may be empty – swallow JSON parse errors
+        try { return await response.json(); } catch { return {}; }
     } catch (error) {
-        console.error(`API Error (attempt ${retryCount + 1}):`, error);
-        
-        // Try HTTP fallback if HTTPS fails and we're on first attempt
-        if (retryCount === 0 && apiUrl.startsWith('https://') && apiUrl.includes('0.0.0.0:1337')) {
-            const httpUrl = apiUrl.replace('https://', 'http://');
-            console.log(`Trying HTTP fallback: ${httpUrl}`);
-            sessionStorage.setItem(ENDPOINT_STORAGE_KEY, httpUrl);
-            return sendDataToApi(formData, retryCount + 1);
+        clearTimeout(timer);
+        console.error('Primary fetch failed:', error);
+        throw error; // caller handles fallback
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Helper: attempt send via navigator.sendBeacon (fires during unload)
+// ---------------------------------------------------------------------------
+function sendBeaconApi(formData) {
+    const apiUrl = sessionStorage.getItem(ENDPOINT_STORAGE_KEY);
+    if (!apiUrl || typeof navigator.sendBeacon !== 'function') return false;
+    try {
+        const blob = new Blob([JSON.stringify({ data: formData })], { type: 'application/json' });
+        const ok = navigator.sendBeacon(apiUrl, blob);
+        if (ok) {
+            momentumDataSent = true;
+            console.log('✅ Data queued via sendBeacon');
         }
-        
-        // Safari-specific fallback: Try using a different approach
-        if (retryCount === 0 && (error.message.includes('Load failed') || error.message.includes('CORS') || error.message.includes('Access-Control'))) {
-            console.log('Safari CORS issue detected, trying alternative approach...');
-            
-            // Try using XMLHttpRequest as a fallback for Safari
-            try {
-                const xhrResponse = await new Promise((resolve, reject) => {
-                    const xhr = new XMLHttpRequest();
-                    xhr.open('POST', apiUrl, true);
-                    xhr.setRequestHeader('Content-Type', 'application/json');
-                    xhr.setRequestHeader('Accept', 'application/json');
-                    
-                    xhr.onload = function() {
-                        if (xhr.status >= 200 && xhr.status < 300) {
-                            try {
-                                const result = JSON.parse(xhr.responseText);
-                                resolve(result);
-                            } catch (parseError) {
-                                reject(new Error('Failed to parse XHR response'));
-                            }
-                        } else {
-                            reject(new Error(`XHR failed with status: ${xhr.status}`));
-                        }
-                    };
-                    
-                    xhr.onerror = function() {
-                        reject(new Error('XHR request failed'));
-                    };
-                    
-                    xhr.send(JSON.stringify(data));
-                });
-                
-                console.log('XHR fallback succeeded:', xhrResponse);
-                return xhrResponse;
-            } catch (xhrError) {
-                console.warn('XHR fallback also failed:', xhrError);
-            }
-        }
-        
-        // Try without authentication if we get 401/403 and we're on first attempt
-        if (retryCount === 0 && (error.message.includes('401') || error.message.includes('403'))) {
-            console.log('Trying without authentication...');
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data)
-            });
-            
-            if (response.ok) {
-                const result = await response.json();
-                console.log('API Response (no auth):', result);
-                return result;
-            }
-        }
-        
-        // If we haven't exceeded max retries, try again
-        if (retryCount < MAX_RETRIES) {
-            console.log(`Retrying in ${RETRY_DELAY}ms... (${retryCount + 1}/${MAX_RETRIES})`);
-            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
-            return sendDataToApi(formData, retryCount + 1);
-        } else {
-            console.error(`Failed after ${MAX_RETRIES + 1} attempts`);
-            
-            // Final fallback: Store data locally so it's not lost
-            try {
-                const failedData = {
-                    timestamp: new Date().toISOString(),
-                    data: formData,
-                    status: 'failed_to_send'
-                };
-                
-                const existingFailedData = JSON.parse(localStorage.getItem('momentum-failed-data') || '[]');
-                existingFailedData.push(failedData);
-                localStorage.setItem('momentum-failed-data', JSON.stringify(existingFailedData));
-                
-                console.log('Data stored locally as fallback due to API failure');
-            } catch (storageError) {
-                console.error('Failed to store data locally:', storageError);
-            }
-            
-            throw error; // Re-throw after all retries exhausted
-        }
+        return ok;
+    } catch (e) {
+        console.warn('sendBeacon failed:', e);
+        return false;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Helper: persist payload locally for later retry (used if everything else fails)
+// ---------------------------------------------------------------------------
+function storeFailedData(formData) {
+    try {
+        const failedData = JSON.parse(localStorage.getItem('momentum-failed-data') || '[]');
+        failedData.push({
+            timestamp: new Date().toISOString(),
+            data: formData,
+            status: 'queued_for_retry'
+        });
+        localStorage.setItem('momentum-failed-data', JSON.stringify(failedData));
+        console.log('Data stored locally for later retry');
+    } catch (e) {
+        console.error('Failed to store data locally:', e);
     }
 }
 
@@ -655,17 +561,27 @@ function initializeQuizDataReporter() {
                                 console.warn('No cached pre-submit data found or JSON parse failed');
                             }
                             const finalData = { ...cached, name };
-                            console.log('Sending final merged data to API:', finalData);
-                            // Send full merged data in background (don't await)
-                            sendDataToApi(finalData).catch(error => {
-                                 console.error('Error sending final data:', error);
-                            });
+                            console.log('Prepared final payload:', finalData);
+
+                            // Keep reference for pagehide fallback
+                            momentumPendingData = finalData;
+
+                            // Primary attempt – awaited fetch
+                            try {
+                                await sendDataToApi(finalData);
+                            } catch (primaryError) {
+                                console.warn('Primary send failed, trying sendBeacon...', primaryError);
+                                const beaconOk = sendBeaconApi(finalData);
+                                if (!beaconOk) {
+                                    storeFailedData(finalData);
+                                }
                             }
-                        
-                        // Wait a moment to ensure data is processed
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                        
-                        // Get email from cookies for redirect URL
+                        }
+
+                        // Small visual grace period so loader is noticeable
+                        await new Promise(resolve => setTimeout(resolve, 150));
+
+                        // Get email and country for redirect URL
                         const email = getCookie('email-input') || getCookie('email') || getCookie('ajs_user_id');
                         const country = sessionStorage.getItem('momentum-user-country');
                         
@@ -780,3 +696,15 @@ window.QuizDataReporter = {
     // sendNameToApi is kept for potential future use but not used in current flow
     initializeQuizDataReporter
 }; 
+
+// -------------------------
+// pagehide safety-net hook
+// -------------------------
+window.addEventListener('pagehide', () => {
+    if (!momentumDataSent && momentumPendingData) {
+        console.log('pagehide: attempting sendBeacon fallback');
+        if (!sendBeaconApi(momentumPendingData)) {
+            storeFailedData(momentumPendingData);
+        }
+    }
+}); 
