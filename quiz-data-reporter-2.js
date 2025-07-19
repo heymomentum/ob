@@ -969,7 +969,7 @@ function initializeQuizDataReporter() {
 
             // Build fallback redirect URL with email and country
             let fallbackUrl =
-              'https://dev.d2fs7239g9ozrr.amplifyapp.com/es/results';
+              'https://ob.try-momentum.com/es/results';
             const params = new URLSearchParams();
 
             if (email) {
