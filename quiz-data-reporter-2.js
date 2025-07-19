@@ -1,7 +1,7 @@
 // Quiz Data Reporter - Handles data reporting for quiz forms
-// Version: 3.0.0
+// Version: 3.0.1
 
-console.log('🎯 Quiz Data Reporter v3.0.0 loaded (Pre-submit mode)');
+console.log('🎯 Quiz Data Reporter v3.0.1 loaded (Pre-submit mode)');
 
 // Session storage keys
 const ENDPOINT_STORAGE_KEY = 'momentum-api-endpoint';
