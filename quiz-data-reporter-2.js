@@ -936,8 +936,8 @@ function initializeQuizDataReporter() {
             const baseUrl =
               currentDomain === 'try-momentum.com' ||
               currentDomain === 'www.try-momentum.com'
-                ? 'https://ob.try-momentum.com/en/results'
-                : 'https://ob-dev.try-momentum.com/en/results';
+                ? 'https://ob.try-momentum.com/es/results'
+                : 'https://ob-dev.try-momentum.com/es/results';
             let redirectUrl = baseUrl;
             const params = new URLSearchParams();
 
