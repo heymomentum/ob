@@ -1,11 +1,18 @@
 // Quiz Data Reporter - Handles data reporting for quiz forms
-// Version: 2.0.2
+// Version: 2.0.3
 
-console.log('🎯 Quiz Data Reporter v2.0.2 loaded (Pre-submit mode)');
+console.log('🎯 Quiz Data Reporter v2.0.3 loaded (Pre-submit mode)');
 
 // Session storage keys
 const ENDPOINT_STORAGE_KEY = 'momentum-api-endpoint';
 const FORM_DATA_STORAGE_KEY = 'momentum-form-data-cache';
+
+// ---------------------------------------------------------------------------
+// Added: reliable send configuration & state flags
+// ---------------------------------------------------------------------------
+const SEND_TIMEOUT_MS = 5000; // max wait for primary fetch
+let momentumDataSent = false; // becomes true once payload delivered
+let momentumPendingData = null; // holds payload until confirmed sent
 
 // Function to fetch user's country based on IP and store in sessionStorage
 function getUserGeoLocation() {
@@ -652,7 +659,7 @@ function initializeQuizDataReporter() {
   const defaultEndpoint =
     currentDomain === 'try-momentum.com' ||
     currentDomain === 'www.try-momentum.com'
-      ? 'https://4bropw3xnc.execute-api.eu-central-1.amazonaws.com/development'
+      ? 'https://o37rcsefc3.execute-api.us-east-1.amazonaws.com/production/api/onboarding/qst'
       : 'https://4bropw3xnc.execute-api.eu-central-1.amazonaws.com/development/api/onboarding/qst';
 
   console.log(`Quiz form data will be reported to: ${defaultEndpoint}`);
@@ -791,8 +798,12 @@ function initializeQuizDataReporter() {
             const country = sessionStorage.getItem('momentum-user-country');
 
             // Build redirect URL with email and country
-            let redirectUrl =
-              'https://dev.d2fs7239g9ozrr.amplifyapp.com/es/results';
+            const baseUrl =
+              currentDomain === 'try-momentum.com' ||
+              currentDomain === 'www.try-momentum.com'
+                ? 'https://ob.try-momentum.com/en/results'
+                : 'https://ob-dev.try-momentum.com/en/results';
+            let redirectUrl = baseUrl;
             const params = new URLSearchParams();
 
             if (email) {
