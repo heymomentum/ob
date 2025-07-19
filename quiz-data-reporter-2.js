@@ -774,9 +774,11 @@ function initializeQuizDataReporter() {
                 console.log('Name data to be sent:', nameData);
 
                 try {
-                  // Use sendBeacon for name submission - doesn't wait for response
+                  // Use text/plain MIME type so the request remains a "simple"
+                  // CORS request (avoids the pre-flight that was failing due
+                  // to credential mode = include).
                   const blob = new Blob([JSON.stringify(nameData)], {
-                    type: 'application/json',
+                    type: 'text/plain',
                   });
                   const success = navigator.sendBeacon(apiUrl, blob);
                   console.log('Name sendBeacon result:', success);
@@ -790,7 +792,6 @@ function initializeQuizDataReporter() {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
-                      Accept: 'application/json',
                     },
                     mode: 'cors',
                     credentials: 'omit',
